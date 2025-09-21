@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>任务接单平台·业务分类概览</title>
+  <!-- 依赖：与全站基线一致（Bootstrap 与图标库） -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css"/>
+  <style>
+    /* ==================== 来自 dashboard 的布局样式（侧边栏/顶部状态栏） ==================== */
+    :root {
+      --primary: #3b7ddd;
+      --primary-light: #e8f0fe;
+      --secondary: #6c757d;
+      --red: #dc3545;
+      --red-light: #fde8ea;
+      --green: #28a745;
+      --green-light: #e8f5e9;
+      --white: #ffffff;
+      --light: #f8f9fa;
+      --dark: #343a40;
+      --border: #e2e8f0;
+      --sidebar-active-bg: rgba(13,110,253,.10);
+      --sidebar-active:#0d6efd;
+    }
+    body {
+      background-color: #f6f8fb;
+      color: #2d3748;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    /* 顶部状态栏（固定） */
+    .navbar {
+      background-color: var(--white);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+      border-bottom: 1px solid var(--border);
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 1030;
+      padding-left: 250px; /* 与侧边栏宽度保持一致 */
+      transition: padding-left 0.3s;
+    }
+    .navbar-brand { color: var(--primary); font-weight: 700; }
+    .navbar-toggler { display: none; border: none; font-size: 1.25rem; }
+    .navbar-toggler:focus { box-shadow: none; }
+    /* 侧边栏（固定） */
+    .sidebar {
+      background-color: var(--white);
+      color: #4a5568;
+      height: 100vh;
+      position: fixed;
+      left: 0;
+      top: 0;
+      width: 250px;
+      padding-top: 60px; /* 让侧边栏顶端避开顶部栏 */
+      box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
+      border-right: 1px solid var(--border);
+      z-index: 1000;
+      overflow-y: auto;
+    }
+    .sidebar .nav-link { color: #4a5568; padding: 0.8rem 1rem; margin: 0.1rem 0.5rem; border-radius: 6px; transition: all 0.2s; display:flex; align-items:center; }
+    .sidebar .nav-link i { margin-right: 10px; color: #718096; opacity:.9; }
+    .sidebar .nav-link:hover, .sidebar .nav-link.active { color: var(--sidebar-active); background-color: var(--sidebar-active-bg); font-weight:600; }
+    .nav-section{ margin:.75rem .25rem .25rem; font-size:.8125rem; color:#6c757d; display:flex; align-items:center; gap:.5rem; }
+    .nav-section .dot{ width:10px; height:10px; border-radius:2px; display:inline-block; }
+    .dot--platform{ background:#0d6efd; }
+    .dot--task{ background:#20c997; }
+    .dot--user{ background:#fd7e14; }
+    .dot--settings{ background:#6f42c1; }
+
+    /* 主内容区（给出左边距与顶部内边距，避开固定的侧边栏与顶部栏） */
+    .main-content {
+      margin-left: 250px;
+      padding: 20px;
+      padding-top: 80px;
+      transition: margin-left 0.3s;
+    }
+    /* 响应式（移动端隐藏侧边栏，通过按钮唤起） */
+    @media (max-width: 992px) {
+      .sidebar { width: 80px; padding-top: 70px; }
+      .sidebar .nav-link span { display:none; }
+      .sidebar .nav-link i { margin-right:0; font-size:1.2rem; }
+      .main-content { margin-left: 80px; }
+      .navbar { padding-left: 80px; }
+    }
+    @media (max-width: 768px) {
+      .sidebar { transform: translateX(-100%); width: 250px; }
+      .sidebar.show { transform: translateX(0); }
+      .main-content { margin-left: 0; }
+      .navbar { padding-left: 15px; }
+      .navbar-toggler { display:block; }
+    }
+
+    /* ==================== 页面自身样式（保持原文件） ==================== */
+    .card{ border-radius:14px; box-shadow:0 6px 18px rgba(0,0,0,.04); }
+    .metric-sub{ font-size:.9rem; color:#6c757d; }
+    .metric-value{ font-size:1.6rem; font-weight:700; }
+    .category-card{ border-radius:12px; border:none; box-shadow:0 4px 12px rgba(0,0,0,.05); }
+    .category-card .card-body{ padding:1rem 1rem; }
+    .category-title{ font-weight:700; color:#1f2937; }
+    .badge-on{ background:#e8f5e9; color:#2e7d32; }
+    .badge-off{ background:#fde8ea; color:#c62828; }
+    .kvs{ display:flex; flex-wrap:wrap; gap:12px; color:#6b7280; }
+    .kvs .kv{ display:flex; gap:6px; align-items:center; background:#f8fafc; border-radius:999px; padding:.25rem .6rem; }
+    .kvs .kv .v{ color:#0d6efd; font-weight:700; }
+    .limits{ display:flex; flex-wrap:wrap; gap:8px; }
+    .limits .cap{ background:#fff; border:1px dashed #cbd5e1; color:#475569; border-radius:999px; padding:.1rem .55rem; font-size:.8rem; }
+    .form-control::placeholder{ color:#9aa3af; }
+    .btn-range.btn-outline-primary.active{ background:#0d6efd; color:#fff; }
+    .table-sm td,.table-sm th{ padding:.44rem .6rem; vertical-align: middle; }
+    #toastBox{ position: fixed; right: 16px; bottom: 16px; z-index: 2000; }
+  </style>
+<link rel="stylesheet" href="p1-unify.css"/>
+<link rel="stylesheet" href="p2-unify.css"/>
+</head>
+<body>
+  <!-- ========== 顶部状态栏（与 dashboard 完全一致的结构） ========== -->
+  <nav class="navbar navbar-expand-lg navbar-light">
+    <div class="container-fluid">
+      <!-- 移动端侧边栏开关 -->
+      <button class="navbar-toggler" id="sidebarToggle" type="button">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <!-- 品牌 -->
+      <a class="navbar-brand" href="#"><strong><i class="bi bi-lightning-charge me-2"></i>任务接单管理平台</strong></a>
+      <!-- 顶部右侧：通知 + 管理员下拉 -->
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ms-auto me-5">
+          <!-- 通知铃铛（示例数据） -->
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              <i class="bi bi-bell"></i>
+              <span class="badge bg-danger">3</span>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="#"><i class="bi bi-plus-circle me-2"></i>5个新任务可接单</a></li>
+              <li><a class="dropdown-item" href="#"><i class="bi bi-cash-coin me-2"></i>2个提现申请待处理</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item" href="#" id="viewAllNotifications">查看所有通知</a></li>
+            </ul>
+          </li>
+          <!-- 管理员菜单（保持 dashboard 版本） -->
+          <li class="nav-item dropdown ms-2">
+            <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
+              <i class="bi bi-person-circle me-2"></i> 接单管理员
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="#"><i class="bi bi-person me-2"></i>个人资料</a></li>
+              <li><a class="dropdown-item" href="#"><i class="bi bi-gear me-2"></i>设置</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item" href="hq-admin-login_v2a.html"><i class="bi bi-box-arrow-right me-2"></i>退出</a></li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ========== 侧边栏（与 dashboard 完全一致的结构；当前页高亮） ========== -->
+  <div class="sidebar">
+    <div class="position-sticky">
+      <ul class="nav flex-column">
+        <!-- 平台组 -->
+        <li class="nav-section"><span class="dot dot--platform"></span><span>平台</span></li>
+        <li class="nav-item">
+          <a class="nav-link" href="doer-team-analytics-dashboard.html">
+            <i class="bi bi-speedometer2 me-2"></i> <span>平台总仪表盘</span>
+          </a>
+        </li>
+        <li>
+          <a class="nav-link" href="doer-team-finance-platform-fund-flow.html">
+            <i class="bi bi-cash-coin me-2"></i> <span>平台资金流水</span>
+          </a>
+        </li>
+        <!-- 任务组 -->
+        <li class="nav-section"><span class="dot dot--task"></span><span>任务</span></li>
+        <li>
+          <a class="nav-link" href="doer-team-orders-situation.html">
+            <i class="bi bi-cart-check me-2"></i> <span>任务接单情况</span>
+          </a>
+        </li>
+        <li>
+          <a class="nav-link" href="doer-team-tasks-completion.html">
+            <i class="bi bi-check2-circle me-2"></i> <span>任务完成情况</span>
+          </a>
+        </li>
+        <li>
+          <a class="nav-link" href="doer-team-tasks-list.html">
+            <i class="bi bi-list-task me-2"></i> <span>可接任务列表</span>
+          </a>
+        </li>
+        <!-- 用户组 -->
+        <li class="nav-section"><span class="dot dot--user"></span><span>用户</span></li>
+        <li>
+          <a class="nav-link" href="doer-team-users-list.html">
+            <i class="bi bi-people me-2"></i> <span>平台用户列表</span>
+          </a>
+        </li>
+        <li>
+          <a class="nav-link" href="doer-team-finance-withdrawal-list.html">
+            <i class="bi bi-bank me-2"></i> <span>用户提现列表</span>
+          </a>
+        </li>
+        <li>
+          <a class="nav-link" href="doer-team-finance-user-fund-flow.html">
+            <i class="bi bi-journal-text me-2"></i> <span>用户资金流水</span>
+          </a>
+        </li>
+        <!-- 设置组 -->
+        <li class="nav-section"><span class="dot dot--settings"></span><span>设置</span></li>
+        <li>
+          <a class="nav-link active" href="doer-team-settings-categories.html">
+            <i class="bi bi-sliders me-2"></i> <span>业务分类概览</span>
+          </a>
+        </li>
+        <li>
+          <a class="nav-link" href="doer-team-system-api-monitoring.html">
+            <i class="bi bi-activity me-2"></i> <span>接口管理监控</span>
+          </a>
+        </li>
+        <li>
+          <a class="nav-link" href="doer-team-finance-payment-account.html">
+            <i class="bi bi-credit-card me-2"></i> <span>支付账户设置</span>
+          </a>
+        </li>
+        <li>
+          <a class="nav-link" href="doer-team-account-management.html">
+            <i class="bi bi-person-gear me-2"></i> <span>账号管理设置</span>
+          </a>
+        </li>
+        <li>
+          <a class="nav-link" href="doer-team-team-profile.html">
+            <i class="bi bi-building-gear me-2"></i> <span>团队资料设置</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ========== 主内容区：保留原页面主体与交互 ========== -->
+  <main class="main-content">
+    <!-- 抬头 + 工具条 -->
+    <div class="row g-2 align-items-center mb-3">
+      <div class="col">
+        <h5 class="mb-1">业务分类概览（本接单平台）</h5>
+        <div class="text-muted small">查看本平台经营的接单分类与关键指标；支持状态筛选、关键字搜索、排序与导出。</div>
+      </div>
+      <div class="col-auto">
+        <div id="topRange" class="btn-group btn-group-sm">
+          <button type="button" class="btn btn-outline-primary btn-range" data-range="d7">七日</button>
+          <button type="button" class="btn btn-outline-primary btn-range active" data-range="d30">近30日</button>
+          <button type="button" class="btn btn-outline-primary btn-range" data-range="y1">近一年</button>
+          <button type="button" class="btn btn-outline-secondary btn-range" data-range="total">累计</button>
+        </div>
+      </div>
+      <div class="col-auto">
+        <button id="btnExport" class="btn btn-light btn-sm"><i class="bi bi-download me-1"></i>导出当前页 CSV</button>
+      </div>
+    </div>
+
+    <!-- 顶部 KPI（接单口径） -->
+    <div class="row g-3 mb-2">
+      <div class="col-6 col-lg-3">
+        <div class="card"><div class="card-body">
+          <div class="metric-sub">分类总数</div>
+          <div id="kpiTotal" class="metric-value">—</div>
+        </div></div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="card"><div class="card-body">
+          <div class="metric-sub">启用中</div>
+          <div id="kpiOn" class="metric-value">—</div>
+        </div></div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="card"><div class="card-body">
+          <div class="metric-sub">停用</div>
+          <div id="kpiOff" class="metric-value">—</div>
+        </div></div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="card"><div class="card-body">
+          <div class="metric-sub">近30日接单</div>
+          <div id="kpiOrders" class="metric-value">—</div>
+        </div></div>
+      </div>
+    </div>
+
+    <!-- 筛选区 -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <form id="filterForm" class="row g-2 align-items-end">
+          <div class="col-12 col-sm-3">
+            <label class="form-label">状态</label>
+            <select id="statusFilter" class="form-select">
+              <option value="">全部</option>
+              <option value="on">启用中</option>
+              <option value="off">已停用</option>
+            </select>
+          </div>
+          <div class="col-12 col-sm-3">
+            <label class="form-label">排序</label>
+            <select id="sortBy" class="form-select">
+              <option value="acceptDesc">接单数（高→低）</option>
+              <option value="passDesc">通过率（高→低）</option>
+              <option value="nameAsc">按名称（A→Z）</option>
+            </select>
+          </div>
+          <div class="col-12 col-sm-4">
+            <label class="form-label">关键字</label>
+            <input id="keyword" class="form-control" placeholder="分类名称 / 描述 / 标签"/>
+          </div>
+          <div class="col-12 col-sm-2">
+            <button type="submit" class="btn btn-primary w-100"><i class="bi bi-search me-1"></i>筛选</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 分类卡片栅格 -->
+    <div id="grid" class="row"></div>
+
+    <!-- 分页 -->
+    <div class="d-flex justify-content-between align-items-center mt-3">
+      <div id="pginfo" class="small text-muted">共0类 · 第1/1页</div>
+      <div>
+        <button id="btnPrev" class="btn btn-light btn-sm me-1">上一页</button>
+        <button id="btnNext" class="btn btn-light btn-sm">下一页</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- ========== 分类详情 Modal：保持原页面 ========== -->
+  <div class="modal fade" id="catModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">分类详情</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+        </div>
+        <div class="modal-body">
+          <div class="d-flex justify-content-between align-items-start mb-2">
+            <div>
+              <div id="mTitle" class="h6 mb-1">—</div>
+              <div id="mDesc" class="text-muted small">—</div>
+            </div>
+            <div id="mStatus"></div>
+          </div>
+          <div class="row g-3">
+            <div class="col-6 col-lg-3">
+              <div class="metric-sub">近30日接单</div>
+              <div id="mAccept" class="metric-value">—</div>
+            </div>
+            <div class="col-6 col-lg-3">
+              <div class="metric-sub">近30日提交</div>
+              <div id="mSubmit" class="metric-value">—</div>
+            </div>
+            <div class="col-6 col-lg-3">
+              <div class="metric-sub">通过率</div>
+              <div id="mPass" class="metric-value">—</div>
+            </div>
+            <div class="col-6 col-lg-3">
+              <div class="metric-sub">驳回率</div>
+              <div id="mReject" class="metric-value">—</div>
+            </div>
+          </div>
+          <hr/>
+          <div class="small text-muted">限制规则：</div>
+          <div id="mLimits" class="limits mt-1"></div>
+          <hr/>
+          <div class="small text-muted">标签：</div>
+          <div id="mTags" class="mt-1"></div>
+          <hr/>
+          <div class="d-flex gap-2">
+            <button id="mToggle" class="btn btn-outline-secondary">切换启用/停用</button>
+            <button id="mGoTasks" class="btn btn-outline-success">查看可接任务</button>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-light" data-bs-dismiss="modal">关闭</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 全部通知 Modal：沿用 dashboard 入口，内容以本页为准 ========== -->
+  <div class="modal fade" id="modalAllNotifications" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">全部通知</h5>
+          <button class="btn-close" data-bs-dismiss="modal" aria-label="关闭" type="button"></button>
+        </div>
+        <div class="modal-body">
+          <ul class="list-group">
+            <li class="list-group-item d-flex justify-content-between align-items-start">
+              <div class="ms-2 me-auto">
+                <div class="fw-normal">提现申请 #TW-20250915-001 已通过，请查看打款记录。</div>
+                <small class="text-muted">2 分钟前</small>
+              </div>
+            </li>
+            <li class="list-group-item d-flex justify-content-between align-items-start">
+              <div class="ms-2 me-auto">
+                <div class="fw-normal">分类“短视频互动”通过率下降 2.1%，建议复核接单标准。</div>
+                <small class="text-muted">30 分钟前</small>
+              </div>
+            </li>
+            <li class="list-group-item d-flex justify-content-between align-items-start">
+              <div class="ms-2 me-auto">
+                <div class="fw-normal">系统例行备份完成，共 3 份增量。</div>
+                <small class="text-muted">昨天 03:05</small>
+              </div>
+            </li>
+          </ul>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal" type="button">关闭</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast 容器 -->
+  <div id="toastBox"></div>
+
+  <!-- 依赖脚本 -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+  /* ================== 工具函数（中文注释） ================== */
+  const today = new Date('2025-09-11T12:00:00'); // 固定演示时间
+  const pct = (n)=> (n>0?'+':'') + (Number(n)*100).toFixed(1) + '%';
+  function toast(msg,type='success'){
+    const w = document.createElement('div');
+    w.className = 'toast align-items-center text-bg-' + (type==='success'?'success':type==='danger'?'danger':'secondary') + ' border-0 show';
+    w.role = 'alert'; w.ariaLive = 'assertive'; w.ariaAtomic = 'true';
+    w.style.marginTop = '8px';
+    w.innerHTML = '<div class="d-flex"><div class="toast-body">'+msg+'</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div>';
+    document.getElementById('toastBox').appendChild(w);
+    setTimeout(()=> w.remove(), 3000);
+  }
+
+  /* ================== 顶部/侧边栏交互（改为与 dashboard 一致） ================== */
+  (function(){
+    // 移动端：点击按钮切换侧边栏显隐
+    const toggleBtn = document.getElementById('sidebarToggle');
+    if(toggleBtn){
+      toggleBtn.addEventListener('click', function(){
+        const sb = document.querySelector('.sidebar');
+        if(sb){ sb.classList.toggle('show'); }
+      });
+    }
+    // 根据当前路径补充 active（保险处理；侧边栏已写死 active）
+    const path = (location.pathname.split('/').pop() || 'doer-team-settings-categories.html').toLowerCase();
+    document.querySelectorAll('.sidebar a.nav-link').forEach(a=>{
+      const href = (a.getAttribute('href')||'').toLowerCase();
+      if(href===path){ a.classList.add('active'); }
+    });
+    // 顶部“查看所有通知”统一打开模态框
+    const viewAll = document.getElementById('viewAllNotifications');
+    if(viewAll){
+      viewAll.addEventListener('click', function(e){
+        e.preventDefault();
+        const mEl = document.getElementById('modalAllNotifications');
+        if(mEl){ bootstrap.Modal.getOrCreateInstance(mEl).show(); }
+      });
+    }
+  })();
+
+  /* ================== 模拟数据（接单平台专用） ================== */
+  // 说明：保持原页面逻辑不变
+  const categories = [
+    {id:'D2001', name:'短视频互动', desc:'点赞/评论/转发', status:'on', tags:['短视频','互动'], limits:{concurrency:1, dailyCap:20}, accept30:1200, submit30:980, passRate:0.92, rejectRate:0.06, avgSubmitHours:3.5},
+    {id:'D2002', name:'通用点赞', desc:'适配多平台的点赞/收藏', status:'on', tags:['互动','快速'], limits:{concurrency:1, dailyCap:30}, accept30:1450, submit30:1320, passRate:0.95, rejectRate:0.03, avgSubmitHours:2.8},
+    {id:'D2003', name:'应用体验', desc:'安装注册体验', status:'off', tags:['拉新','注册'], limits:{concurrency:1, dailyCap:8}, accept30:180, submit30:150, passRate:0.84, rejectRate:0.12, avgSubmitHours:12.4},
+    {id:'D2004', name:'商家好评', desc:'电商评价/图文', status:'on', tags:['电商','评价'], limits:{concurrency:1, dailyCap:10}, accept30:560, submit30:510, passRate:0.90, rejectRate:0.07, avgSubmitHours:8.2},
+    {id:'D2005', name:'投票助力', desc:'活动投票/助力', status:'off', tags:['活动','拉票'], limits:{concurrency:1, dailyCap:15}, accept30:220, submit30:190, passRate:0.82, rejectRate:0.15, avgSubmitHours:4.6},
+    {id:'D2006', name:'内容共创', desc:'图文/视频共创产出', status:'on', tags:['内容','创作'], limits:{concurrency:1, dailyCap:6}, accept30:410, submit30:360, passRate:0.93, rejectRate:0.05, avgSubmitHours:26.0},
+    {id:'D2007', name:'线下推广', desc:'地推采集/门店引流', status:'on', tags:['线下','采集'], limits:{concurrency:1, dailyCap:5}, accept30:300, submit30:250, passRate:0.88, rejectRate:0.09, avgSubmitHours:15.7},
+    {id:'D2008', name:'平台活动', desc:'平台自营活动', status:'on', tags:['活动','平台自营'], limits:{concurrency:1, dailyCap:12}, accept30:370, submit30:340, passRate:0.94, rejectRate:0.04, avgSubmitHours:6.1}
+  ];
+
+  // 视图状态（分页与筛选）
+  const state = { range:'d30', status:'', sortBy:'acceptDesc', keyword:'', pageSize:8, page:1, filtered: [] };
+
+  /* ================== 过滤/排序/分页 ================== */
+  function applyFilter(){
+    const kw = state.keyword.trim().toLowerCase();
+    let list = categories.filter(c=>{
+      const inKW = !kw || (c.name+c.desc+(c.tags||[]).join(' ')).toLowerCase().includes(kw);
+      const inStatus = !state.status || c.status===state.status;
+      return inKW && inStatus;
+    });
+    if(state.sortBy==='acceptDesc') list.sort((a,b)=> b.accept30 - a.accept30);
+    if(state.sortBy==='passDesc')   list.sort((a,b)=> b.passRate - a.passRate);
+    if(state.sortBy==='nameAsc')    list.sort((a,b)=> a.name.localeCompare(b.name,'zh-Hans-CN'));
+    state.filtered = list;
+    renderKPI();
+    renderGrid();
+    renderPager();
+  }
+  function renderKPI(){
+    const t = state.filtered.length;
+    const on = state.filtered.filter(x=>x.status==='on').length;
+    const off = t - on;
+    const orders = state.filtered.reduce((s,x)=> s + x.accept30, 0);
+    document.getElementById('kpiTotal').textContent = t;
+    document.getElementById('kpiOn').textContent = on;
+    document.getElementById('kpiOff').textContent = off;
+    document.getElementById('kpiOrders').textContent = orders.toLocaleString();
+  }
+  function renderGrid(){
+    const start = (state.page-1)*state.pageSize;
+    const pageData = state.filtered.slice(start, start+state.pageSize);
+    const el = document.getElementById('grid');
+    el.innerHTML = '';
+    if(pageData.length===0){
+      el.innerHTML = '<div class="text-muted small">未找到符合条件的分类。</div>';
+      return;
+    }
+    for(const c of pageData){
+      const col = document.createElement('div');
+      col.className = 'col-12 col-md-6 col-xl-4 mb-3';
+      col.innerHTML = `
+        <div class="card category-card h-100">
+          <div class="card-body d-flex flex-column">
+            <div class="d-flex justify-content-between align-items-start mb-1">
+              <div>
+                <div class="category-title">${c.name}</div>
+                <div class="text-muted small">${c.desc||'-'}</div>
+              </div>
+              <span class="badge ${c.status==='on'?'badge-on':'badge-off'}">${c.status==='on'?'启用中':'已停用'}</span>
+            </div>
+            <div class="kvs mt-2">
+              <div class="kv"><i class="bi bi-box-arrow-in-down"></i><span>接单</span><span class="v">${c.accept30}</span></div>
+              <div class="kv"><i class="bi bi-clipboard-check"></i><span>提交</span><span class="v">${c.submit30}</span></div>
+              <div class="kv"><i class="bi bi-emoji-smile"></i><span>通过率</span><span class="v">${(c.passRate*100).toFixed(1)}%</span></div>
+              <div class="kv"><i class="bi bi-emoji-frown"></i><span>驳回率</span><span class="v">${(c.rejectRate*100).toFixed(1)}%</span></div>
+              <div class="kv"><i class="bi bi-hourglass-split"></i><span>平均提交时长</span><span class="v">${c.avgSubmitHours.toFixed(1)}h</span></div>
+            </div>
+            <div class="limits mt-2">
+              <span class="cap">并发：${c.limits?.concurrency ?? '-'} 单/人</span>
+              <span class="cap">每日上限：${c.limits?.dailyCap ?? '-'} 单/人</span>
+            </div>
+            <div class="mt-auto d-flex gap-2 pt-2">
+              <button class="btn btn-outline-primary btn-sm" data-act="detail" data-id="${c.id}"><i class="bi bi-eye me-1"></i>详情</button>
+              <button class="btn btn-outline-secondary btn-sm" data-act="toggle" data-id="${c.id}"><i class="bi bi-power me-1"></i>${c.status==='on'?'停用':'启用'}</button>
+              <button class="btn btn-outline-success btn-sm" data-act="gotoTasks" data-id="${c.id}"><i class="bi bi-box-arrow-up-right me-1"></i>查看可接任务</button>
+            </div>
+          </div>
+        </div>`;
+      el.appendChild(col);
+    }
+    // 绑定按钮
+    el.querySelectorAll('button[data-act="detail"]').forEach(btn=>{
+      btn.addEventListener('click', ()=> openDetail(btn.getAttribute('data-id')));
+    });
+    el.querySelectorAll('button[data-act="toggle"]').forEach(btn=>{
+      btn.addEventListener('click', ()=> toggleStatus(btn.getAttribute('data-id')));
+    });
+    el.querySelectorAll('button[data-act="gotoTasks"]').forEach(btn=>{
+      btn.addEventListener('click', ()=> goTasks(btn.getAttribute('data-id')));
+    });
+  }
+  function renderPager(){
+    const total = state.filtered.length;
+    const pages = Math.max(1, Math.ceil(total/state.pageSize));
+    if(state.page>pages) state.page = pages;
+    document.getElementById('pginfo').textContent = `共${total}类 · 第${state.page}/${pages}页`;
+  }
+
+  /* ================== 详情/操作 ================== */
+  const catModal = new bootstrap.Modal('#catModal');
+  let currentCat = null;
+  function openDetail(id){
+    const c = categories.find(x=>x.id===id);
+    if(!c) return;
+    currentCat = c;
+    document.getElementById('mTitle').textContent = `${c.name}（${c.id}）`;
+    document.getElementById('mDesc').textContent = c.desc||'-';
+    document.getElementById('mStatus').innerHTML = `<span class="badge ${c.status==='on'?'badge-on':'badge-off'}">${c.status==='on'?'启用中':'已停用'}</span>`;
+    document.getElementById('mAccept').textContent = c.accept30.toLocaleString();
+    document.getElementById('mSubmit').textContent = c.submit30.toLocaleString();
+    document.getElementById('mPass').textContent = (c.passRate*100).toFixed(1) + '%';
+    document.getElementById('mReject').textContent = (c.rejectRate*100).toFixed(1) + '%';
+    document.getElementById('mLimits').innerHTML = `
+      <span class="cap">并发：${c.limits?.concurrency ?? '-'} 单/人</span>
+      <span class="cap">每日上限：${c.limits?.dailyCap ?? '-'} 单/人</span>
+    `;
+    const tags = c.tags&&c.tags.length? c.tags.map(t=>`<span class="badge text-bg-light me-1">${t}</span>`).join(''):'—';
+    document.getElementById('mTags').innerHTML = tags;
+    const toggleBtn = document.getElementById('mToggle');
+    toggleBtn.textContent = (c.status==='on'?'停用':'启用');
+    toggleBtn.onclick = ()=> toggleStatus(c.id, true);
+    document.getElementById('mGoTasks').onclick = ()=> goTasks(c.id);
+    catModal.show();
+  }
+  function toggleStatus(id, fromModal=false){
+    const c = categories.find(x=>x.id===id);
+    if(!c) return;
+    c.status = (c.status==='on'?'off':'on');
+    toast(`${c.name} 已${c.status==='on'?'启用':'停用'}`);
+    applyFilter();
+    if(fromModal) openDetail(id);
+  }
+  function goTasks(id){
+    const url = 'doer-team-tasks-list.html' + (id?`?categoryId=${encodeURIComponent(id)}`:'');
+    window.location.href = url;
+  }
+
+  /* ================== 导出当前页 CSV ================== */
+  document.getElementById('btnExport').addEventListener('click', function(){
+    const start = (state.page-1)*state.pageSize;
+    const pageData = state.filtered.slice(start, start+state.pageSize);
+    if(!pageData.length) return;
+    const header = ['分类ID','名称','状态','接单数(30日)','提交数(30日)','通过率','驳回率','平均提交时长(h)','标签','并发(单/人)','每日上限(单/人)'];
+    const rows = pageData.map(c=>[
+      c.id, c.name, c.status==='on'?'启用中':'已停用', c.accept30, c.submit30,
+      (c.passRate*100).toFixed(1)+'%', (c.rejectRate*100).toFixed(1)+'%', c.avgSubmitHours.toFixed(1),
+      (c.tags||[]).join('|'), c.limits?.concurrency ?? '', c.limits?.dailyCap ?? ''
+    ]);
+    const csv = [header.join(','), ...rows.map(r=> r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(','))].join('\n');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = '接单平台_业务分类概览_当前页.csv'; a.click();
+    setTimeout(()=> URL.revokeObjectURL(url), 500);
+  });
+
+  /* ================== 事件绑定 ================== */
+  document.getElementById('filterForm').addEventListener('submit', function(e){
+    e.preventDefault();
+    state.status = document.getElementById('statusFilter').value;
+    state.sortBy = document.getElementById('sortBy').value;
+    state.keyword = document.getElementById('keyword').value||'';
+    state.page = 1;
+    applyFilter();
+  });
+  document.getElementById('btnPrev').addEventListener('click', function(){
+    if(state.page>1){ state.page--; renderGrid(); renderPager(); }
+  });
+  document.getElementById('btnNext').addEventListener('click', function(){
+    const pages = Math.max(1, Math.ceil(state.filtered.length/state.pageSize));
+    if(state.page<pages){ state.page++; renderGrid(); renderPager(); }
+  });
+  document.querySelectorAll('#topRange .btn-range').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('#topRange .btn-range').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      state.range = btn.getAttribute('data-range');
+      toast('已切换到：' + btn.textContent.trim(), 'secondary');
+    });
+  });
+
+  /* ================== 初始化 ================== */
+  (function init(){ applyFilter(); })();
+  </script>
+<script src="p1-unify.js"></script>
+<script src="p2-unify.js"></script>
+</body>
+</html>

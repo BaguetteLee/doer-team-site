@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>任务接单平台·用户资金流水</title>
+  <!-- 与 doer-team-analytics-dashboard 保持一致的依赖版本 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet"/>
+
+  <style>
+    /* ======== 全局主题（沿用 doer 仪表盘） ======== */
+    :root {
+        --primary: #3b7ddd;
+        --primary-light: #e8f0fe;
+        --secondary: #6c757d;
+        --red: #dc3545;
+        --red-light: #fde8ea;
+        --green: #28a745;
+        --green-light: #e8f5e9;
+        --white: #ffffff;
+        --light: #f8f9fa;
+        --dark: #343a40;
+        --border: #e2e8f0;
+    }
+    body{ background:#f5f6f8; color:#2d3748; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+
+    /* ======== 侧边栏（与 doer 仪表盘一致） ======== */
+    .sidebar{
+      background: var(--white);
+      color:#4a5568;
+      height:100vh;
+      position:fixed; left:0; top:0; width:250px;
+      padding-top:60px;
+      box-shadow: 2px 0 10px rgba(0,0,0,.05);
+      border-right:1px solid var(--border);
+      z-index:1000; overflow-y:auto;
+    }
+    .sidebar .nav-link{ color:#4a5568; padding:.8rem 1rem; margin:.1rem .5rem; border-radius:6px; transition: all .2s; display:flex; align-items:center; }
+    .sidebar .nav-link i{ margin-right:10px; color:#718096; opacity:.9; }
+    .sidebar .nav-link:hover, .sidebar .nav-link.active{ color:var(--primary); background:var(--primary-light); }
+    .sidebar .nav-link.active i, .sidebar .nav-link:hover i{ color:var(--primary); }
+
+    /* 侧边栏分组与色块（与 doer 仪表盘一致） */
+    .nav-section{ margin:.75rem .25rem .25rem; font-size:.8125rem; color:#6c757d; display:flex; align-items:center; gap:.5rem; }
+    .nav-section .dot{ width:10px; height:10px; border-radius:2px; display:inline-block; }
+    .dot--platform{ background:#0d6efd; }
+    .dot--task{ background:#20c997; }
+    .dot--user{ background:#fd7e14; }
+    .dot--settings{ background:#6f42c1; }
+
+    /* ======== 顶部导航（与 doer 仪表盘一致） ======== */
+    .navbar{
+      background:var(--white);
+      box-shadow:0 2px 10px rgba(0,0,0,.05);
+      border-bottom:1px solid var(--border);
+      position:fixed; top:0; left:0; right:0; z-index:1030;
+      padding-left:250px; /* 与侧边栏宽度对齐 */
+    }
+    .navbar-brand{ color:var(--primary); font-weight:700; }
+    .navbar .dropdown-menu{ border-radius:8px; box-shadow:0 10px 15px rgba(0,0,0,.08); border:1px solid var(--border); }
+    .navbar .dropdown-item{ padding:.5rem 1rem; border-radius:4px; margin:.1rem .5rem; width:auto; }
+
+    /* ======== 主内容区域 ======== */
+    .main-content{ margin-left:250px; padding:20px; padding-top:88px; }
+    @media (max-width: 992px){
+      .sidebar{ width:80px; padding-top:70px; }
+      .sidebar .nav-link span{ display:none; }
+      .sidebar .nav-link i{ margin-right:0; font-size:1.2rem; }
+      .main-content{ margin-left:80px; }
+      .navbar{ padding-left:80px; }
+    }
+    @media (max-width: 768px){
+      .sidebar{ transform:translateX(-100%); width:250px; }
+      .sidebar.show{ transform:translateX(0); }
+      .main-content{ margin-left:0; }
+      .navbar{ padding-left:15px; }
+      .navbar-toggler{ display:block; }
+    }
+    .navbar-toggler{ display:none; border:none; font-size:1.25rem; }
+    .navbar-toggler:focus{ box-shadow:none; }
+
+    /* ======== 本页面样式（在保留结构的前提下轻量补充） ======== */
+    .card{ border:none; border-radius:10px; box-shadow:0 4px 6px rgba(0,0,0,.04); }
+    .card-header{ background:var(--white); border-bottom:1px solid var(--border); font-weight:600; }
+    .metric-sub{ font-size:.9rem; color:#6c757d; }
+    .metric-value{ font-size:1.6rem; font-weight:700; }
+    .table-sm td,.table-sm th{ padding:.44rem .6rem; vertical-align:middle; }
+    .table-compact{ font-size:16px; line-height:1.35; }
+    /* 金额与余额列：接单平台要求左对齐并稍加间距 */
+    th.money, td.money{ text-align:left !important; padding-left:16px !important; }
+    .placeholder-muted{ color:#94a3b8; }
+    .btn-range.btn-outline-primary.active{ background:var(--primary); color:#fff; }
+
+    /* 小徽章配色 */
+    .badge-in{ background: var(--green-light); color: var(--green); }
+    .badge-out{ background: var(--red-light); color: var(--red); }
+  </style>
+<link rel="stylesheet" href="p1-unify.css"/>
+<link rel="stylesheet" href="p2-unify.css"/>
+</head>
+<body>
+  <!-- ======== 顶部状态栏（与 doer 仪表盘一致） ======== -->
+  <nav class="navbar navbar-expand-lg navbar-light">
+    <div class="container-fluid">
+      <button class="navbar-toggler" id="sidebarToggle" type="button">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <a class="navbar-brand" href="#"><strong><i class="bi bi-lightning-charge me-2"></i>任务接单管理平台</strong></a>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ms-auto me-5">
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              <i class="bi bi-bell"></i>
+              <span class="badge bg-danger">3</span>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="#"><i class="bi bi-plus-circle me-2"></i>5个新任务可接单</a></li>
+              <li><a class="dropdown-item" href="#"><i class="bi bi-cash-coin me-2"></i>2个提现申请待处理</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item" id="viewAllNotifications" href="#"><i class="bi bi-list-ul me-2"></i>查看所有通知</a></li>
+            </ul>
+          </li>
+          <li class="nav-item dropdown ms-2">
+            <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
+              <i class="bi bi-person-circle me-2"></i> 接单管理员
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="#"><i class="bi bi-person me-2"></i>个人资料</a></li>
+              <li><a class="dropdown-item" href="#"><i class="bi bi-gear me-2"></i>设置</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item" href="#"><i class="bi bi-box-arrow-right me-2"></i>退出</a></li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ======== 侧边栏（与 doer 仪表盘一致；本页 active 在“用户资金流水”） ======== -->
+  <div class="sidebar">
+    <div class="position-sticky">
+      <ul class="nav flex-column">
+        <!-- 平台组 -->
+        <li class="nav-section"><span class="dot dot--platform"></span><span>平台</span></li>
+        <li class="nav-item"><a class="nav-link" href="doer-team-analytics-dashboard.html"><i class="bi bi-speedometer2 me-2"></i><span> 平台总仪表盘</span></a></li>
+        <li><a class="nav-link" href="doer-team-finance-platform-fund-flow.html"><i class="bi bi-cash-coin me-2"></i><span> 平台资金流水</span></a></li>
+        <!-- 任务组 -->
+        <li class="nav-section"><span class="dot dot--task"></span><span>任务</span></li>
+        <li><a class="nav-link" href="doer-team-orders-situation.html"><i class="bi bi-cart-check me-2"></i><span> 任务接单情况</span></a></li>
+        <li><a class="nav-link" href="doer-team-tasks-completion.html"><i class="bi bi-check2-circle me-2"></i><span> 任务完成情况</span></a></li>
+        <li><a class="nav-link" href="doer-team-tasks-list.html"><i class="bi bi-list-task me-2"></i><span> 可接任务列表</span></a></li>
+        <!-- 用户组 -->
+        <li class="nav-section"><span class="dot dot--user"></span><span>用户</span></li>
+        <li><a class="nav-link" href="doer-team-users-list.html"><i class="bi bi-people me-2"></i><span> 平台用户列表</span></a></li>
+        <li><a class="nav-link" href="doer-team-finance-withdrawal-list.html"><i class="bi bi-bank me-2"></i><span> 用户提现列表</span></a></li>
+        <li><a class="nav-link active" href="doer-team-finance-user-fund-flow.html"><i class="bi bi-journal-text me-2"></i><span> 用户资金流水</span></a></li>
+        <!-- 设置组 -->
+        <li class="nav-section"><span class="dot dot--settings"></span><span>设置</span></li>
+        <li><a class="nav-link" href="doer-team-settings-categories.html"><i class="bi bi-sliders me-2"></i><span> 业务分类概览</span></a></li>
+        <li><a class="nav-link" href="doer-team-system-api-monitoring.html"><i class="bi bi-activity me-2"></i><span> 接口管理监控</span></a></li>
+        <li><a class="nav-link" href="doer-team-finance-payment-account.html"><i class="bi bi-credit-card me-2"></i><span> 支付账户设置</span></a></li>
+        <li><a class="nav-link" href="doer-team-account-management.html"><i class="bi bi-person-gear me-2"></i><span> 账号管理设置</span></a></li>
+        <li><a class="nav-link" href="doer-team-team-profile.html"><i class="bi bi-building-gear me-2"></i><span> 团队资料设置</span></a></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ======== 主内容：基于发布端“用户资金流水”改造为接单用户视角 ======== -->
+  <main class="main-content">
+    <!-- 工具条：时间口径与导出 -->
+    <div class="row g-2 align-items-center mb-3">
+      <div class="col-auto">
+        <div class="btn-group btn-group-sm" id="topRange">
+          <!-- 时间范围按钮（默认七日） -->
+          <button type="button" class="btn btn-outline-primary btn-range" data-range="d1">昨日</button>
+          <button type="button" class="btn btn-outline-primary btn-range active" data-range="d7">七日</button>
+          <button type="button" class="btn btn-outline-primary btn-range" data-range="d30">近30日</button>
+          <button type="button" class="btn btn-outline-primary btn-range" data-range="y1">近一年</button>
+          <button type="button" class="btn btn-outline-secondary btn-range" data-range="total">累计</button>
+        </div>
+      </div>
+      <div class="col-auto ms-auto">
+        <button class="btn btn-light btn-sm me-1" id="btnExport"><i class="bi bi-download me-1"></i>导出当前页 CSV</button>
+      </div>
+    </div>
+
+    <!-- 查询条件（接单用户口径，不包含充值） -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <form class="row g-3 align-items-end" id="queryForm">
+          <div class="col-12 col-sm-4 col-md-3">
+            <label class="form-label">用户ID</label>
+            <input id="inpUserId" class="form-control" placeholder="如：U1001"/>
+          </div>
+          <div class="col-12 col-sm-4 col-md-3">
+            <label class="form-label">用户名</label>
+            <input id="inpUsername" class="form-control" placeholder="如：张三"/>
+          </div>
+          <div class="col-12 col-sm-4 col-md-3">
+            <label class="form-label">类型</label>
+            <select id="selType" class="form-select">
+              <option value="">全部类型</option>
+              <option>提现</option>
+              <option>冻结</option>
+              <option>解冻</option>
+              <option>任务佣金</option>
+            </select>
+          </div>
+          <div class="col-12 col-md-3">
+            <button class="btn btn-primary w-100" type="submit"><i class="bi bi-search me-1"></i>查询</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 用户概要（累计字段替换为“累计佣金 / 累计提现”） -->
+    <div class="card mb-3" id="userSummaryCard" style="display:none;">
+      <div class="card-body">
+        <div class="row g-3 align-items-center">
+          <div class="col-md-4">
+            <div class="fw-bold" id="sumUserTitle">—</div>
+            <div class="text-muted small" id="sumUserSub">—</div>
+          </div>
+          <div class="col-md-8">
+            <div class="row g-3">
+              <div class="col-6 col-lg-3">
+                <div class="metric-sub">可用余额</div>
+                <div class="metric-value" id="sumBalance">¥ —</div>
+              </div>
+              <div class="col-6 col-lg-3">
+                <div class="metric-sub">冻结金额</div>
+                <div class="metric-value" id="sumFrozen">¥ —</div>
+              </div>
+              <div class="col-6 col-lg-3">
+                <div class="metric-sub">累计佣金</div>
+                <div class="metric-value" id="sumCommission">¥ —</div>
+              </div>
+              <div class="col-6 col-lg-3">
+                <div class="metric-sub">累计提现</div>
+                <div class="metric-value" id="sumWithdraw">¥ —</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 明细列表 -->
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span>资金流水明细（本平台口径·接单用户）</span>
+        <div class="small text-muted">每页 8 条</div>
+      </div>
+      <div class="card-body table-responsive">
+        <table class="table table-sm table-compact align-middle mb-0" id="tblFlows">
+          <thead class="table-light">
+            <tr>
+              <th style="min-width:140px">时间</th>
+              <th>流水号</th>
+              <th>类型</th>
+              <th>方向</th>
+              <th class="money">金额</th>
+              <th class="money">余额</th>
+              <th>备注</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <div id="emptyHint" class="placeholder-muted small mt-2" style="display:none;">未找到符合条件的资金流水。</div>
+      </div>
+      <div class="d-flex justify-content-between align-items-center px-3 pb-3">
+        <div class="small text-muted" id="pginfo-tblFlows">共0条 · 第1/1页</div>
+        <div>
+          <button class="btn btn-light btn-sm me-1" data-pgprev="tblFlows">上一页</button>
+          <button class="btn btn-light btn-sm" data-pgnext="tblFlows">下一页</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- 详情弹窗（点击流水号查看） -->
+  <div class="modal fade" id="flowDetailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">资金流水详情</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row mb-2">
+            <div class="col-md-8">
+              <div class="fw-bold" id="fd-title">—</div>
+              <div class="text-muted small" id="fd-sub">—</div>
+            </div>
+            <div class="col-md-4 text-md-end">
+              <div>金额：<strong id="fd-amount">¥ —</strong></div>
+              <div class="text-muted small">记账时间：<span id="fd-time">—</span></div>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm">
+              <tbody id="fd-body"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-light" data-bs-dismiss="modal">关闭</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 顶栏通知：查看全部（与 doer 仪表盘一致） -->
+  <div class="modal fade" id="modalAllNotifications" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">全部通知</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+        </div>
+        <div class="modal-body">
+          <ul class="list-group">
+            <li class="list-group-item d-flex justify-content-between align-items-start">
+              <div class="ms-2 me-auto">
+                <div class="fw-normal">任务 #D250916-112 提交完成凭证，待审核。</div>
+                <small class="text-muted">2 分钟前</small>
+              </div>
+            </li>
+            <li class="list-group-item d-flex justify-content-between align-items-start">
+              <div class="ms-2 me-auto">
+                <div class="fw-normal">用户 U-99510 余额调整：后台冻结 ¥50.00。</div>
+                <small class="text-muted">10 分钟前</small>
+              </div>
+            </li>
+            <li class="list-group-item d-flex justify-content-between align-items-start">
+              <div class="ms-2 me-auto">
+                <div class="fw-normal">任务 #D250915-006 进入异议处理中。</div>
+                <small class="text-muted">30 分钟前</small>
+              </div>
+            </li>
+            <li class="list-group-item d-flex justify-content-between align-items-start">
+              <div class="ms-2 me-auto">
+                <div class="fw-normal">系统例行备份完成，共 2 份增量。</div>
+                <small class="text-muted">今天 03:12</small>
+              </div>
+            </li>
+          </ul>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 依赖脚本 -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // ================= 工具方法（中文注释） =================
+    const fmt = (n)=> '¥ ' + Number(n).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+
+    // 固定演示时间，便于七日/30日等切换效果复现
+    const today = new Date('2025-09-11T12:00:00');
+
+    // 计算不同时间口径的起始时间
+    function rangeStart(key){
+      const d = new Date(today);
+      if(key==='d1'){ d.setDate(d.getDate()-1); d.setHours(0,0,0,0); return d; }
+      if(key==='d7'){ d.setDate(d.getDate()-6); d.setHours(0,0,0,0); return d; }
+      if(key==='d30'){ d.setDate(d.getDate()-29); d.setHours(0,0,0,0); return d; }
+      if(key==='y1'){ d.setFullYear(d.getFullYear()-1); d.setHours(0,0,0,0); return d; }
+      return new Date('1970-01-01T00:00:00');
+    }
+    function inRange(ts, key){ if(key==='total') return true; const start = rangeStart(key); return ts>=start && ts<=today; }
+
+    // ================= 模拟接单用户与资金流水 =================
+    // 口径差异说明：接单端用户不发生“充值”，仅存在 任务佣金（流入）、提现（流出）、冻结/解冻（保证金）
+    const users = [
+      {id:'U1001', username:'张三', balance:3560.25, frozen:200.00, totalCommission:1280.00, totalWithdraw:1800.00},
+      {id:'U1002', username:'李四', balance:812.10,  frozen:0.00,   totalCommission:760.00,  totalWithdraw:400.00},
+      {id:'U1003', username:'王五', balance:12990.00,frozen:1200.00,totalCommission:12900.00,totalWithdraw:3000.00}
+    ];
+
+    // 字段定义：type（提现/冻结/解冻/任务佣金），direction（流入/流出）
+    const flows = [
+      // —— 张三 U1001（近7日多条） ——
+      {userId:'U1001', username:'张三', time:'2025-09-11 09:12:33', serial:'DF202509110001', type:'任务佣金', direction:'流入', amount:120.00,  balance:3560.25, remark:'任务#T2001 完成奖励'},
+      {userId:'U1001', username:'张三', time:'2025-09-10 17:40:00', serial:'DF202509100088', type:'提现',   direction:'流出', amount:300.00,  balance:2760.25, remark:'微信提现到账'},
+      {userId:'U1001', username:'张三', time:'2025-09-10 10:00:00', serial:'DF202509100021', type:'任务佣金', direction:'流入', amount:80.00,   balance:3060.25, remark:'任务#T2000 完成奖励'},
+      {userId:'U1001', username:'张三', time:'2025-09-09 19:10:11', serial:'DF202509090006', type:'冻结',   direction:'流出', amount:200.00,  balance:2940.25, remark:'任务#T2002 冻结保证金'},
+      {userId:'U1001', username:'张三', time:'2025-09-09 20:55:01', serial:'DF202509090009', type:'解冻',   direction:'流入', amount:200.00,  balance:3140.25, remark:'任务#T2002 保证金解冻'},
+      // —— 李四 U1002（跨30天） ——
+      {userId:'U1002', username:'李四', time:'2025-09-06 09:45:27', serial:'DF202509060101', type:'任务佣金', direction:'流入', amount:300.00,  balance:812.10,  remark:'任务#T1988 完成奖励'},
+      {userId:'U1002', username:'李四', time:'2025-08-24 08:50:40', serial:'DF202508240011', type:'提现',   direction:'流出', amount:200.00,  balance:512.10,  remark:'对公打款'},
+      // —— 王五 U1003（跨一年） ——
+      {userId:'U1003', username:'王五', time:'2025-04-03 10:05:06', serial:'DF202504030001', type:'任务佣金', direction:'流入', amount:3500.00, balance:12990.00,remark:'任务#T1502 完成奖励'},
+      {userId:'U1003', username:'王五', time:'2025-02-11 11:11:11', serial:'DF202502110123', type:'冻结',   direction:'流出', amount:1200.00, balance:9490.00, remark:'任务#T1500 冻结保证金'},
+      {userId:'U1003', username:'王五', time:'2025-02-18 11:11:11', serial:'DF202502180222', type:'解冻',   direction:'流入', amount:1200.00, balance:10690.00,remark:'任务#T1500 保证金解冻'}
+    ];
+
+    // ================= 页面状态 =================
+    const state = {
+      range:'d7',       // 时间口径
+      typeFilter:'',    // 类型筛选
+      pageSize:8,       // 分页大小（固定 8 条）
+      page:1,           // 当前页码
+      total:0,          // 过滤后总条数
+      currentUser:null  // 当前选中用户
+    };
+
+    // ======== 侧边栏收合（移动端） ========
+    document.getElementById('sidebarToggle')?.addEventListener('click', function(){
+      document.querySelector('.sidebar')?.classList.toggle('show');
+    });
+
+    // ======== 顶部通知“查看全部”模态 ========
+    document.getElementById('viewAllNotifications')?.addEventListener('click', function(e){
+      e.preventDefault();
+      const mEl = document.getElementById('modalAllNotifications');
+      if(mEl){ bootstrap.Modal.getOrCreateInstance(mEl).show(); }
+    });
+
+    // ======== 时间范围切换 ========
+    document.querySelectorAll('#topRange .btn-range').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        document.querySelectorAll('#topRange .btn-range').forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        state.range = btn.getAttribute('data-range');
+        state.page = 1;
+        renderTable();
+      });
+    });
+
+    // ======== 查询提交 ========
+    document.getElementById('queryForm').addEventListener('submit', function(e){
+      e.preventDefault();
+      const id = document.getElementById('inpUserId').value.trim();
+      const name = document.getElementById('inpUsername').value.trim();
+      let found = null;
+      if(id){ found = users.find(u => u.id.toLowerCase() === id.toLowerCase()); }
+      else if(name){ found = users.find(u => u.username === name); }
+      state.currentUser = found || null;
+      state.typeFilter = document.getElementById('selType').value || '';
+      state.page = 1;
+      renderSummary();
+      renderTable();
+    });
+
+    // 类型筛选变化（无需重新提交）
+    document.getElementById('selType').addEventListener('change', function(){
+      state.typeFilter = this.value || '';
+      state.page = 1;
+      renderTable();
+    });
+
+    // ======== 导出当前页 CSV ========
+    document.getElementById('btnExport').addEventListener('click', function(){
+      const data = getPaged();
+      if(!data.length) return;
+      const header = ['时间','流水号','类型','方向','金额','余额','备注'];
+      const rows = data.map(x=>[x.time,x.serial,x.type,x.direction,x.amount.toFixed(2),x.balance.toFixed(2),(x.remark||'-').replace(/\\n/g,' ')]);
+      const csv = [header.join(','), ...rows.map(r=> r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(','))].join('\\n');
+      const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = '接单平台_用户资金流水_当前页.csv'; a.click();
+      setTimeout(()=> URL.revokeObjectURL(url), 500);
+    });
+
+    // ======== 视图渲染 ========
+    function renderSummary(){
+      const card = document.getElementById('userSummaryCard');
+      if(!state.currentUser){ card.style.display='none'; return; }
+      card.style.display='block';
+      const u = state.currentUser;
+      document.getElementById('sumUserTitle').textContent = `${u.username}（${u.id}）`;
+      document.getElementById('sumUserSub').textContent = '账户状态：正常 | 币种：CNY | 口径：本平台';
+      document.getElementById('sumBalance').textContent = fmt(u.balance);
+      document.getElementById('sumFrozen').textContent = fmt(u.frozen);
+      document.getElementById('sumCommission').textContent = fmt(u.totalCommission);
+      document.getElementById('sumWithdraw').textContent = fmt(u.totalWithdraw);
+    }
+
+    function getFiltered(){
+      if(!state.currentUser) return [];
+      const list = flows
+        .filter(f => f.userId === state.currentUser.id)
+        .filter(f => !state.typeFilter || f.type === state.typeFilter)
+        .filter(f => inRange(new Date(f.time.replace(' ','T')), state.range))
+        .sort((a,b)=> new Date(b.time.replace(' ','T')) - new Date(a.time.replace(' ','T')));
+      return list;
+    }
+    function getPaged(){
+      const data = getFiltered();
+      state.total = data.length;
+      const start = (state.page-1)*state.pageSize;
+      return data.slice(start, start+state.pageSize);
+    }
+
+    function renderTable(){
+      const tbody = document.querySelector('#tblFlows tbody');
+      const empty = document.getElementById('emptyHint');
+      tbody.innerHTML = '';
+      const data = getPaged();
+
+      // 空提示
+      if(state.total===0){
+        empty.style.display='block';
+        document.getElementById('pginfo-tblFlows').textContent = '共0条 · 第1/1页';
+        return;
+      } else {
+        empty.style.display='none';
+      }
+
+      // 渲染行
+      for(const row of data){
+        const tr = document.createElement('tr');
+
+        // 时间
+        const tdTime = document.createElement('td'); tdTime.textContent = row.time; tr.appendChild(tdTime);
+
+        // 流水号（可点详情）
+        const tdSerial = document.createElement('td');
+        const a = document.createElement('a'); a.href='#'; a.textContent=row.serial; a.className='text-decoration-none';
+        a.addEventListener('click', (e)=>{ e.preventDefault(); openDetail(row); });
+        tdSerial.appendChild(a); tr.appendChild(tdSerial);
+
+        // 类型
+        const tdType = document.createElement('td'); tdType.textContent = row.type; tr.appendChild(tdType);
+
+        // 方向徽章
+        const tdDir = document.createElement('td');
+        const spDir = document.createElement('span');
+        const isIn = row.direction === '流入';
+        spDir.className = 'badge ' + (isIn ? 'badge-in' : 'badge-out');
+        spDir.textContent = row.direction;
+        tdDir.appendChild(spDir); tr.appendChild(tdDir);
+
+        // 金额（左对齐）
+        const tdAmt = document.createElement('td'); tdAmt.className = 'money ' + (row.direction==='流入' ? 'text-success' : 'text-danger');
+        tdAmt.textContent = (row.direction==='流入' ? '+' : '-') + row.amount.toFixed(2);
+        tr.appendChild(tdAmt);
+
+        // 余额（左对齐）
+        const tdBal = document.createElement('td'); tdBal.className = 'money'; tdBal.textContent = row.balance.toFixed(2); tr.appendChild(tdBal);
+
+        // 备注
+        const tdNote = document.createElement('td'); tdNote.textContent = row.remark || '-'; tr.appendChild(tdNote);
+
+        tbody.appendChild(tr);
+      }
+
+      // 分页信息
+      const pages = Math.max(1, Math.ceil(state.total/state.pageSize));
+      document.getElementById('pginfo-tblFlows').textContent = `共${state.total}条 · 第${state.page}/${pages}页`;
+    }
+
+    // 分页按钮
+    document.querySelector('[data-pgprev="tblFlows"]').addEventListener('click', function(){
+      const pages = Math.max(1, Math.ceil(state.total/state.pageSize));
+      if(state.page>1){ state.page--; renderTable(); }
+    });
+    document.querySelector('[data-pgnext="tblFlows"]').addEventListener('click', function(){
+      const pages = Math.max(1, Math.ceil(state.total/state.pageSize));
+      if(state.page<pages){ state.page++; renderTable(); }
+    });
+
+    // 详情弹窗
+    const detailModal = new bootstrap.Modal('#flowDetailModal');
+    function openDetail(row){
+      document.getElementById('fd-title').textContent = `${row.type}（${row.direction}）`;
+      document.getElementById('fd-sub').textContent = `流水号：${row.serial} | 用户：${row.username}（${row.userId}）`;
+      document.getElementById('fd-time').textContent = row.time;
+      document.getElementById('fd-amount').textContent = (row.direction==='流入' ? '+' : '-') + row.amount.toFixed(2);
+
+      const kvs = [
+        ['类型', row.type],
+        ['方向', row.direction],
+        ['金额', (row.direction==='流入' ? '+' : '-') + row.amount.toFixed(2)],
+        ['余额', row.balance.toFixed(2)],
+        ['备注', row.remark || '-']
+      ];
+      const tbody = document.getElementById('fd-body'); tbody.innerHTML = '';
+      for(const [k,v] of kvs){
+        const tr = document.createElement('tr'); tr.innerHTML = `<th style="width:120px">${k}</th><td>${v}</td>`; tbody.appendChild(tr);
+      }
+      detailModal.show();
+    }
+
+    // ================= 默认展示：自动加载“张三 U1001”的七日数据 =================
+    (function init(){
+      state.currentUser = users[0];
+      document.getElementById('inpUserId').value = state.currentUser.id;
+      renderSummary();
+      renderTable();
+    })();
+  </script>
+<script src="p1-unify.js"></script>
+<script src="p2-unify.js"></script>
+</body>
+</html>

@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>任务接单平台·接口管理监控</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+        :root {
+            --primary: #3b7ddd;
+            --primary-light: #e8f0fe;
+            --secondary: #6c757d;
+            --red: #dc3545;
+            --red-light: #fde8ea;
+            --green: #28a745;
+            --green-light: #e8f5e9;
+            --white: #ffffff;
+            --light: #f8f9fa;
+            --dark: #343a40;
+            --border: #e2e8f0;
+        }
+        
+        body {
+            background-color: #f5f6f8;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #2d3748;
+        }
+        
+        .sidebar {
+            background-color: var(--white);
+            color: #4a5568;
+            height: 100vh;
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 250px;
+            padding-top: 60px;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
+            border-right: 1px solid var(--border);
+            z-index: 1000;
+            overflow-y: auto;
+        }
+        
+        .sidebar .nav-link {
+            color: #4a5568;
+            padding: 0.8rem 1rem;
+            margin: 0.1rem 0.5rem;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+        
+        .sidebar .nav-link:hover, .sidebar .nav-link.active {
+            color: var(--primary);
+            background-color: var(--primary-light);
+        }
+        
+        .sidebar .nav-link i {
+            margin-right: 10px;
+            color: #718096;
+        }
+        
+        .sidebar .nav-link.active i, .sidebar .nav-link:hover i {
+            color: var(--primary);
+        }
+        
+        .main-content {
+            margin-left: 250px;
+            padding: 20px;
+            padding-top: 80px;
+            transition: margin-left 0.3s;
+        }
+        
+        .navbar {
+            background-color: var(--white);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            border-bottom: 1px solid var(--border);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1030;
+            padding-left: 250px;
+            transition: padding-left 0.3s;
+        }
+        
+        .stat-card {
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.04);
+            transition: transform 0.2s, box-shadow 0.2s;
+            border: none;
+            overflow: hidden;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.08);
+        }
+        
+        .dashboard-card {
+            background: var(--white);
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.04);
+            margin-bottom: 24px;
+            border: none;
+        }
+        
+        .card-header {
+            background-color: var(--white);
+            border-bottom: 1px solid var(--border);
+            font-weight: 600;
+            padding: 1rem 1.5rem;
+        }
+        
+        .card-body {
+            padding: 1.5rem;
+        }
+        
+        .btn {
+            border-radius: 6px;
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+            transition: all 0.2s;
+        }
+        
+        .btn-sm {
+            padding: 0.25rem 0.75rem;
+            font-size: 0.875rem;
+        }
+        
+        .btn-primary {
+            background-color: var(--primary);
+            border-color: var(--primary);
+        }
+        
+        .btn-primary:hover {
+            background-color: #2c6ac8;
+            border-color: #2c6ac8;
+        }
+        
+        .btn-outline-primary {
+            color: var(--primary);
+            border-color: var(--primary);
+        }
+        
+        .btn-outline-primary:hover {
+            background-color: var(--primary);
+            color: white;
+        }
+        
+        .activity-item {
+            border-left: 3px solid var(--primary);
+            padding-left: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .activity-time {
+            font-size: 0.8rem;
+            color: var(--secondary);
+        }
+        
+        .badge {
+            border-radius: 6px;
+            font-weight: 500;
+            padding: 0.35em 0.65em;
+        }
+        
+        .navbar-brand {
+            color: var(--primary);
+            font-weight: 700;
+        }
+        
+        .dropdown-menu {
+            border-radius: 8px;
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.08);
+            border: 1px solid var(--border);
+        }
+        
+        .dropdown-item {
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            margin: 0.1rem 0.5rem;
+            width: auto;
+        }
+        
+        h4, h6 {
+            color: #2d3748;
+            font-weight: 600;
+        }
+        
+        /* 卡片顶部边框样式 */
+        .card-border-red {
+            border-top: 4px solid var(--red);
+        }
+        
+        .card-border-blue {
+            border-top: 4px solid var(--primary);
+        }
+        
+        .card-border-green {
+            border-top: 4px solid var(--green);
+        }
+        
+        .text-red {
+            color: var(--red);
+        }
+        
+        .text-green {
+            color: var(--green);
+        }
+
+        /* 响应式调整 */
+        @media (max-width: 992px) {
+            .sidebar {
+                width: 80px;
+                padding-top: 70px;
+            }
+            
+            .sidebar .nav-link span {
+                display: none;
+            }
+            
+            .sidebar .nav-link i {
+                margin-right: 0;
+                font-size: 1.2rem;
+            }
+            
+            .main-content {
+                margin-left: 80px;
+            }
+            
+            .navbar {
+                padding-left: 80px;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+                width: 250px;
+            }
+            
+            .sidebar.show {
+                transform: translateX(0);
+            }
+            
+            .main-content {
+                margin-left: 0;
+            }
+            
+            .navbar {
+                padding-left: 15px;
+            }
+            
+            .navbar-toggler {
+                display: block;
+            }
+        }
+        
+        .navbar-toggler {
+            display: none;
+            border: none;
+            font-size: 1.25rem;
+        }
+        
+        .navbar-toggler:focus {
+            box-shadow: none;
+        }
+    </style>
+<style id="doer-doctheme-enhance">
+/* 侧边栏色块与 active 高亮（与发布平台统一） */
+:root{ --sidebar-active-bg: rgba(13,110,253,.10); --sidebar-active:#0d6efd; }
+.sidebar .nav-link{ display:flex; align-items:center; }
+.sidebar .nav-link i{ opacity:.9; }
+.sidebar .nav-link.active{ color:var(--sidebar-active); background:var(--sidebar-active-bg); font-weight:600; }
+.nav-section{ margin:.75rem .25rem .25rem; font-size:.8125rem; color:#6c757d; display:flex; align-items:center; gap:.5rem; }
+.nav-section .dot{ width:10px; height:10px; border-radius:2px; display:inline-block; }
+.dot--platform{ background:#0d6efd; }
+.dot--task{ background:#20c997; }
+.dot--user{ background:#fd7e14; }
+.dot--settings{ background:#6f42c1; }
+</style><link rel="stylesheet" href="p1-unify.css"/>
+<link rel="stylesheet" href="p2-unify.css"/>
+</head>
+<body>
+<!-- 顶部导航栏 -->
+<nav class="navbar navbar-expand-lg navbar-light">
+<div class="container-fluid">
+<button class="navbar-toggler" id="sidebarToggle" type="button">
+<span class="navbar-toggler-icon"></span>
+</button>
+<a class="navbar-brand" href="#">
+<strong><i class="bi bi-lightning-charge me-2"></i>任务接单管理平台</strong>
+</a>
+<div class="collapse navbar-collapse" id="navbarNav">
+<ul class="navbar-nav ms-auto me-5">
+<li class="nav-item dropdown">
+<a aria-expanded="false" class="nav-link dropdown-toggle" data-bs-toggle="dropdown" href="#" id="navbarDropdown" role="button">
+<i class="bi bi-bell"></i>
+<span class="badge bg-danger">3</span>
+</a>
+<ul class="dropdown-menu dropdown-menu-end">
+<li><a class="dropdown-item" href="#"><i class="bi bi-plus-circle me-2"></i>5个新任务可接单</a></li>
+<li><a class="dropdown-item" href="#"><i class="bi bi-cash-coin me-2"></i>2个提现申请待处理</a></li>
+<li><hr class="dropdown-divider"/></li>
+<li><a class="dropdown-item" href="#"><i class="bi bi-list-ul me-2"></i>查看所有通知</a></li>
+</ul>
+</li>
+<li class="nav-item dropdown ms-2">
+<a class="nav-link dropdown-toggle d-flex align-items-center" data-bs-toggle="dropdown" href="#" id="userDropdown" role="button">
+<i class="bi bi-person-circle me-2"></i> 接单管理员
+                        </a>
+<ul class="dropdown-menu dropdown-menu-end">
+<li><a class="dropdown-item" href="#"><i class="bi bi-person me-2"></i>个人资料</a></li>
+<li><a class="dropdown-item" href="#"><i class="bi bi-gear me-2"></i>设置</a></li>
+<li><hr class="dropdown-divider"/></li>
+<li><a class="dropdown-item" href="#"><i class="bi bi-box-arrow-right me-2"></i>退出</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+</nav>
+<div class="sidebar">
+<div class="position-sticky">
+<ul class="nav flex-column">
+<!-- 侧边主导航：平台 / 任务 / 用户 / 设置（6字菜单名）；仅当前页链接添加  -->
+<!-- 平台组 -->
+<li class="nav-section"><span class="dot dot--platform"></span><span>平台</span></li>
+<li class="nav-item">
+<a class="nav-link " href="doer-team-analytics-dashboard.html">
+<i class="bi bi-speedometer2 me-2"></i> 平台总仪表盘
+  </a>
+</li>
+<li>
+<a class="nav-link" active href="doer-team-finance-platform-fund-flow.html">
+<i class="bi bi-cash-coin me-2"></i> 平台资金流水
+  </a>
+</li>
+<!-- 任务组 -->
+<li class="nav-section"><span class="dot dot--task"></span><span>任务</span></li>
+<li>
+<a class="nav-link" href="doer-team-orders-situation.html">
+<i class="bi bi-cart-check me-2"></i> 任务接单情况
+  </a>
+</li>
+<li>
+<a class="nav-link" href="doer-team-tasks-completion.html">
+<i class="bi bi-check2-circle me-2"></i> 任务完成情况
+  </a>
+</li>
+<li>
+<a class="nav-link" href="doer-team-tasks-list.html">
+<i class="bi bi-list-task me-2"></i> 可接任务列表
+  </a>
+</li>
+<!-- 用户组 -->
+<li class="nav-section"><span class="dot dot--user"></span><span>用户</span></li>
+<li>
+<a class="nav-link" href="doer-team-users-list.html">
+<i class="bi bi-people me-2"></i> 平台用户列表
+  </a>
+</li>
+<li>
+<a class="nav-link" href="doer-team-finance-withdrawal-list.html">
+<i class="bi bi-bank me-2"></i> 用户提现列表
+  </a>
+</li>
+<li>
+<a class="nav-link" href="doer-team-finance-user-fund-flow.html">
+<i class="bi bi-journal-text me-2"></i> 用户资金流水
+  </a>
+</li>
+<!-- 设置组 -->
+<li class="nav-section"><span class="dot dot--settings"></span><span>设置</span></li>
+<li>
+<a class="nav-link" href="doer-team-settings-categories.html">
+<i class="bi bi-sliders me-2"></i> 业务分类概览
+  </a>
+</li>
+<li>
+<a class="nav-link active" href="doer-team-system-api-monitoring.html">
+<i class="bi bi-activity me-2"></i> 接口管理监控
+  </a>
+</li>
+<li>
+<a class="nav-link" href="doer-team-finance-payment-account.html">
+<i class="bi bi-credit-card me-2"></i> 支付账户设置
+  </a>
+</li>
+<li>
+<a class="nav-link" href="doer-team-account-management.html">
+<i class="bi bi-person-gear me-2"></i> 账号管理设置
+  </a>
+</li>
+<li>
+<a class="nav-link" href="doer-team-team-profile.html">
+<i class="bi bi-building-gear me-2"></i> 团队资料设置
+  </a>
+</li>
+</ul>
+</div>
+</div>
+<main class="main-content main">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 class="mb-0">接口管理监控（本接单平台）</h5>
+      <div class="text-muted small">上次同步：<span id="syncTime">—</span></div>
+    </div>
+
+    <!-- 顶部 4 卡：授权/到期/环境/Scopes -->
+    <section class="row g-3 mb-3">
+      <div class="col-xl-3 col-md-6">
+        <div class="dashboard-card card h-100"><div class="card-body">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <div class="text-muted">授权状态</div>
+              <div class="metric-value" id="authStatus">Active</div>
+              <div class="metric-sub">当前凭据有效</div>
+            </div>
+            <span class="badge text-bg-success align-self-start">已授权</span>
+          </div>
+        </div></div>
+      </div>
+      <div class="col-xl-3 col-md-6">
+        <div class="dashboard-card card h-100"><div class="card-body">
+          <div class="text-muted">授权到期</div>
+          <div class="metric-value" id="authExpire">2026-06-30</div>
+          <div class="metric-sub">剩余 <span id="expireDays">-</span> 天</div>
+        </div></div>
+      </div>
+      <div class="col-xl-3 col-md-6">
+        <div class="dashboard-card card h-100"><div class="card-body">
+          <div class="text-muted">环境</div>
+          <div class="metric-value" id="authEnv">prod</div>
+          <div class="metric-sub">API 基础：<span id="baseHost">api.example.com</span></div>
+        </div></div>
+      </div>
+      <div class="col-xl-3 col-md-6">
+        <div class="dashboard-card card h-100"><div class="card-body d-flex flex-column">
+          <div class="text-muted mb-1">Scopes（总部下发）</div>
+          <div class="mb-2" id="scopesBox"></div>
+          <div class="mt-auto d-flex gap-2">
+            <button class="btn btn-outline-primary btn-sm" id="btnSync"><i class="bi bi-cloud-download me-1"></i>与总部同步</button>
+            <button class="btn btn-outline-secondary btn-sm" id="btnViewAgreement"><i class="bi bi-file-text me-1"></i>查看授权协议</button>
+          </div>
+        </div></div>
+      </div>
+    </section>
+
+    <!-- 凭据与签名 + 调用示例 -->
+    <section class="row g-3 mb-3">
+      <div class="col-lg-7">
+        <div class="dashboard-card card h-100">
+          <div class="card-header">凭据与签名</div>
+          <div class="card-body">
+            <div class="row row-gap">
+              <div class="col-12"><div class="text-muted small">Client ID</div><div class="fw-semibold" id="clientId">DOER_MAIN_x72fd1</div></div>
+              <div class="col-12"><div class="text-muted small">Client Secret</div>
+                <pre class="code mb-1"><code class="mask" id="clientSecret">csec_xxxx_xxxxx</code></pre>
+                <div class="d-flex gap-2">
+                  <button class="btn btn-sm btn-outline-secondary" id="btnRevealSecret">显示</button>
+                  <button class="btn btn-sm btn-outline-primary" id="btnCopySecret">复制</button>
+                  <button class="btn btn-sm btn-outline-danger" id="btnRotateSecret">轮换</button>
+                </div>
+              </div>
+              <div class="col-12">
+                <div class="row">
+                  <div class="col-md-6">
+                    <label class="form-label small text-muted">签名算法</label>
+                    <select class="form-select form-select-sm" id="signAlgo">
+                      <option value="HMAC-SHA256">HMAC-SHA256</option>
+                      <option value="RSA-SHA256">RSA-SHA256（示例）</option>
+                    </select>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label small text-muted">时间戳（秒）</label>
+                    <input class="form-control form-control-sm" id="ts" value=""/>
+                  </div>
+                </div>
+              </div>
+              <div class="col-12">
+                <label class="form-label small text-muted">待签名字符串（建议：METHOD + 路径 + 查询串 + 时间戳 + Body 摘要）</label>
+                <textarea class="form-control" id="plain" rows="3">GET
+/api/v1/tasks
+page=1&amp;pageSize=20
+TIMESTAMP
+</textarea>
+              </div>
+              <div class="col-12">
+                <label class="form-label small text-muted">签名结果（Base64）</label>
+                <pre class="code mb-0"><code class="user-select-all" id="signature">点击“生成签名”后显示</code></pre>
+              </div>
+              <div class="col-12 d-flex gap-2">
+                <button class="btn btn-primary btn-sm" id="btnSign"><i class="bi bi-shield-lock me-1"></i>生成签名</button>
+                <button class="btn btn-outline-secondary btn-sm" id="btnCopySign">复制签名</button>
+              </div>
+              <div class="col-12"><div class="form-hint">说明：HMAC-SHA256 签名在支持 Web Crypto 的浏览器下本地生成；不支持时将展示“示例签名”。</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-5">
+        <div class="dashboard-card card h-100">
+          <div class="card-header">快速调用示例（cURL / JS / Python）</div>
+          <div class="card-body">
+            <div class="mb-2">
+              <label class="form-label small text-muted">API 基础地址</label>
+              <input class="form-control form-control-sm" id="apiBase" value="https://api.example.com"/>
+            </div>
+            <div class="row g-2 mb-2">
+              <div class="col-md-4">
+                <select class="form-select form-select-sm" id="httpMethod">
+                  <option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option>
+                </select>
+              </div>
+              <div class="col-md-8">
+                <input class="form-control form-control-sm" id="apiPath" value="/api/v1/tasks"/>
+              </div>
+            </div>
+            <div class="mb-2">
+              <label class="form-label small text-muted">请求体（JSON）</label>
+              <textarea class="form-control" id="reqBody" rows="3">{ "status": "open" }</textarea>
+            </div>
+            <div class="d-flex gap-2 mb-2">
+              <button class="btn btn-sm btn-outline-primary" id="btnGenCurl">生成 cURL</button>
+              <button class="btn btn-sm btn-outline-primary" id="btnGenJS">生成 JS</button>
+              <button class="btn btn-sm btn-outline-primary" id="btnGenPy">生成 Python</button>
+            </div>
+            <pre class="code mb-0"><code id="snippet">选择上方按钮生成示例代码</code></pre>
+            <div class="form-hint mt-2">所有示例会自动插入 Authorization 与 X-Signature/X-Timestamp 头，并附中文注释。</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Webhook + IP 白名单 -->
+    <section class="row g-3 mb-3">
+      <div class="col-lg-7">
+        <div class="dashboard-card card h-100">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Webhook 回调设置</span>
+            <button class="btn btn-sm btn-outline-danger" id="btnRotateWh">轮换签名密钥</button>
+          </div>
+          <div class="card-body">
+            <div class="row row-gap">
+              <div class="col-12"><div class="text-muted small">回调地址</div><input class="form-control form-control-sm" id="whUrl" value="https://doer.example.com/api/webhook/tasks"/></div>
+              <div class="col-12"><div class="text-muted small">签名密钥（用于校验总部推送）</div><pre class="code mb-0"><code class="mask" id="whSecret">whsec_xxxx_xxxxx</code></pre></div>
+              <div class="col-12 d-flex gap-2">
+                <button class="btn btn-sm btn-outline-secondary" id="btnRevealWh">显示</button>
+                <button class="btn btn-sm btn-outline-primary" id="btnCopyWh">复制</button>
+              </div>
+              <div class="col-12">
+                <div class="table-responsive">
+                  <table class="table table-sm align-middle">
+                    <thead><tr><th>时间</th><th>事件</th><th class="text-end">状态码</th><th class="text-end">耗时(ms)</th></tr></thead>
+                    <tbody id="whTable"></tbody>
+                  </table>
+                </div>
+                <div class="d-flex gap-2">
+                  <button class="btn btn-sm btn-outline-primary" id="btnReplay">重试最近失败</button>
+                  <button class="btn btn-sm btn-outline-secondary" id="btnSendTest">发送测试事件</button>
+                </div>
+              </div>
+            </div>
+            <div class="form-hint mt-2">提示：签名示例为 <code>X-Webhook-Signature</code> 与 <code>X-Webhook-Timestamp</code>；验证方式与上方 HMAC 流程一致。</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-5">
+        <div class="dashboard-card card h-100">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span>IP 白名单</span>
+            <div class="input-group input-group-sm" style="max-width: 280px;">
+              <input class="form-control" id="ipNew" placeholder="如 1.2.3.4 / 10.0.0.0/24"/>
+              <button class="btn btn-outline-primary" id="btnIpAdd">添加</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-sm align-middle">
+                <thead><tr><th>IP / CIDR</th><th class="text-end">操作</th></tr></thead>
+                <tbody id="ipTable"></tbody>
+              </table>
+            </div>
+            <div class="form-hint">说明：IP 白名单仅对“本平台调用总部接口”生效；提交后约 5 分钟全网生效（示例）。</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 配额限流 + 审计日志 -->
+    <section class="row g-3 mb-4">
+      <div class="col-lg-5">
+        <div class="dashboard-card card h-100">
+          <div class="card-header">限流与配额（只读）</div>
+          <div class="card-body">
+            <div class="row row-gap">
+              <div class="col-12"><div class="text-muted small">全局限流（req/min）</div><div class="fw-semibold" id="limitGlobal">1200</div></div>
+              <div class="col-12"><div class="text-muted small">端点限流（示例）</div>
+                <ul class="mb-0">
+                  <li><code>GET /api/v1/tasks</code>：600/min</li>
+                  <li><code>POST /api/v1/tasks</code>：200/min</li>
+                  <li><code>POST /api/v1/finance/recharge</code>：100/min</li>
+                </ul>
+              </div>
+              <div class="col-12"><div class="text-muted small">当日配额</div><div class="fw-semibold">已用 38,210 / 200,000</div></div>
+            </div>
+            <div class="form-hint mt-2">提示：如需提升配额，请联系总部开通。</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-7">
+        <div class="dashboard-card card h-100">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span>审计日志</span>
+            <button class="btn btn-sm btn-outline-secondary" id="btnExportAudit"><i class="bi bi-download me-1"></i>导出 CSV</button>
+          </div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-sm align-middle">
+                <thead><tr><th>时间</th><th>操作</th><th>结果</th><th>操作者</th></tr></thead>
+                <tbody id="auditTable"></tbody>
+              </table>
+            </div>
+            <div class="form-hint">包含：密钥轮换、Webhook 修改、白名单变更、与总部同步等敏感动作。</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+<div aria-hidden="true" class="modal fade" id="modalAllNotifications" tabindex="-1"><div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">全部通知</h5><button aria-label="关闭" class="btn-close" data-bs-dismiss="modal" type="button"></button></div><div class="modal-body"><ul class="list-group"><li class="list-group-item d-flex justify-content-between align-items-start"><div class="ms-2 me-auto"><div class="fw-normal">任务 #D250916-112 提交完成凭证，待审核。</div><small class="text-muted">2 分钟前</small></div></li><li class="list-group-item d-flex justify-content-between align-items-start"><div class="ms-2 me-auto"><div class="fw-normal">用户 U-99510 余额调整：后台充值 ¥100.00。</div><small class="text-muted">10 分钟前</small></div></li><li class="list-group-item d-flex justify-content-between align-items-start"><div class="ms-2 me-auto"><div class="fw-normal">任务 #D250915-006 进入异议处理中。</div><small class="text-muted">30 分钟前</small></div></li><li class="list-group-item d-flex justify-content-between align-items-start"><div class="ms-2 me-auto"><div class="fw-normal">系统例行备份完成，共 2 份增量。</div><small class="text-muted">今天 03:12</small></div></li></ul></div><div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal" type="button">关闭</button></div></div></div>
+
+<script>
+// 中文：移动端侧边栏折叠开关（与 dashboard 一致）
+document.getElementById('sidebarToggle')?.addEventListener('click', function(){
+  document.querySelector('.sidebar')?.classList.toggle('show');
+});
+</script>
+
+
+
+  <!-- 全部通知模态框 -->
+  
+  </div>
+
+  <!-- Toast 容器 -->
+  <div id="toastBox"></div>
+
+  <!-- 依赖脚本 -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    /* ========== 工具函数：Toast 与兜底 ========== */
+    function toast(msg, type='success'){
+      const w = document.createElement('div');
+      w.className = 'toast align-items-center text-bg-' + (type==='success'?'success':type==='danger'?'danger':'secondary') + ' border-0 show';
+      w.role = 'alert'; w.ariaLive = 'assertive'; w.ariaAtomic = 'true';
+      w.style.marginTop = '8px';
+      w.innerHTML = '<div class="d-flex"><div class="toast-body">'+msg+'</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div>';
+      document.getElementById('toastBox').appendChild(w);
+      setTimeout(()=> w.remove(), 2400);
+    }
+    // 侧边栏折叠（移动端）
+    document.getElementById('sidebarToggle')?.addEventListener('click', function(){
+      document.querySelector('.sidebar')?.classList.toggle('show');
+    });
+
+    /* ========== 模型（示例数据） ========== */
+    const BASE_URLS = { dev:'https://dev-api.example.com', stage:'https://stage-api.example.com', prod:'https://api.example.com' };
+    const model = {
+      env:'prod',
+      baseHost:'api.example.com',
+      apiBase:'https://api.example.com',
+      clientId:'DOER_MAIN_x72fd1',
+      clientSecret:'csec_xxxx_xxxxx',
+      whSecret:'whsec_xxxx_xxxxx',
+      scopes:['users.read','tasks.read','tasks.write','finance.read'],
+      authExpire:'2026-06-30',
+      ipWhitelist:['101.86.23.10','60.28.17.233','10.0.1.22/32','192.168.1.0/24'],
+      audit:[
+        {time:'2025-09-14 12:00:00', action:'初始化页面', result:'OK', actor:'Admin'},
+        {time:'2025-09-14 12:00:00', action:'载入总部下发的默认配置', result:'OK', actor:'System'}
+      ],
+      webhookEvents:(()=>{ const L=[]; for(let i=0;i<10;i++){ const ok=Math.random()>0.12; const ts=new Date(Date.now()-i*3600*1000).toISOString().replace('T',' ').slice(0,19);
+        L.push({time:ts, evt: ok?'task.completed':'task.failed', status: ok?200:500, ms: Math.floor(80+Math.random()*120)}); } return L; })()
+    };
+
+    /* ========== 顶部四卡渲染 ========== */
+    function daysUntil(dateStr){ const now=new Date(); const d=new Date(dateStr+'T00:00:00'); return Math.max(0, Math.ceil((d-now)/86400000)); }
+    function renderAuth(){
+      document.getElementById('authStatus').textContent = 'Active';
+      document.getElementById('authExpire').textContent = model.authExpire;
+      document.getElementById('expireDays').textContent = daysUntil(model.authExpire);
+      document.getElementById('authEnv').textContent = model.env;
+      document.getElementById('baseHost').textContent = model.baseHost;
+      const base = (BASE_URLS[model.env]||model.apiBase||'https://api.example.com');
+      const baseInput = document.getElementById('apiBase'); if(baseInput){ baseInput.value = base; baseInput.readOnly = true; }
+      const box = document.getElementById('scopesBox'); box.innerHTML='';
+      model.scopes.forEach(s=>{ const span=document.createElement('span'); span.className='badge badge-scope me-1'; span.textContent=s; box.appendChild(span); });
+      document.getElementById('syncTime').textContent = new Date().toLocaleString();
+    }
+    renderAuth();
+
+    // 与总部同步（演示）
+    document.getElementById('btnSync').addEventListener('click', function(){
+      if(Math.random()>0.5 && model.scopes.indexOf('finance.write')<0) model.scopes.push('finance.write');
+      const y = 2026 + Math.floor(Math.random()*2);
+      model.authExpire = y + '-06-30';
+      model.audit.unshift({time:new Date().toLocaleString(), action:'与总部同步', result:'OK', actor:'Admin'});
+      renderAuth(); renderAudit();
+      toast('已与总部同步授权与配置');
+    });
+    document.getElementById('btnViewAgreement').addEventListener('click', function(){ alert('此处打开授权协议（示例占位）'); });
+
+    /* ========== 凭据与签名 ========== */
+    document.getElementById('clientId').textContent = model.clientId;
+    document.getElementById('apiBase').value = model.apiBase;
+    const secretEl = document.getElementById('clientSecret');
+    let masked=true;
+    document.getElementById('btnRevealSecret').addEventListener('click', function(){ masked=!masked; secretEl.classList.toggle('mask', masked); this.textContent = masked?'显示':'隐藏'; });
+    document.getElementById('btnCopySecret').addEventListener('click', function(){ navigator.clipboard?.writeText(secretEl.textContent.trim()); });
+    document.getElementById('btnRotateSecret').addEventListener('click', function(){
+      model.clientSecret = 'csec_'+Math.random().toString(36).slice(2)+'_'+Date.now().toString(36);
+      secretEl.textContent = model.clientSecret; secretEl.classList.add('mask'); masked=true;
+      model.audit.unshift({time:new Date().toLocaleString(), action:'轮换 Client Secret', result:'OK', actor:'Admin'});
+      renderAudit(); toast('Client Secret 已轮换');
+    });
+
+    // 时间戳默认值
+    document.getElementById('ts').value = Math.floor(Date.now()/1000);
+
+    // 生成签名（优先 WebCrypto）
+    document.getElementById('btnSign').addEventListener('click', async function(){
+      const algo = document.getElementById('signAlgo').value;
+      const ts = document.getElementById('ts').value.trim();
+      const plain = document.getElementById('plain').value.replace('TIMESTAMP', ts);
+      const out = document.getElementById('signature');
+      if(algo==='HMAC-SHA256' && window.crypto && window.crypto.subtle){
+        try{
+          const enc = new TextEncoder();
+          const key = await window.crypto.subtle.importKey('raw', enc.encode(model.clientSecret), {name:'HMAC', hash:'SHA-256'}, false, ['sign']);
+          const sig = await window.crypto.subtle.sign('HMAC', key, enc.encode(plain));
+          const b64 = btoa(String.fromCharCode.apply(null, new Uint8Array(sig)));
+          out.textContent = b64; return;
+        }catch(e){ console.warn('WebCrypto 失败，降级示例：', e); }
+      }
+      out.textContent = 'EXAMPLE_SIGNATURE_'+Math.random().toString(36).slice(2);
+    });
+    document.getElementById('btnCopySign').addEventListener('click', function(){
+      const v=document.getElementById('signature').textContent.trim(); if(v) navigator.clipboard?.writeText(v);
+    });
+
+    // 调用示例生成器
+    function buildHeaders(sig, ts){
+      return {
+        'Authorization': 'Bearer ' + 'tok_xxx',         // 中文：访问令牌（总部颁发）
+        'X-Client-Id' : model.clientId,                 // 中文：客户端标识
+        'X-Signature' : sig || 'EXAMPLE_SIGNATURE',     // 中文：签名
+        'X-Timestamp' : ts  || Math.floor(Date.now()/1000) // 中文：时间戳（秒）
+      };
+    }
+    function genCurl(){
+      const base = document.getElementById('apiBase').value.trim();
+      const m = document.getElementById('httpMethod').value.trim();
+      const p = document.getElementById('apiPath').value.trim();
+      const body = document.getElementById('reqBody').value;
+      const sig = document.getElementById('signature').textContent.trim();
+      const ts  = document.getElementById('ts').value.trim();
+      const h = buildHeaders(sig, ts);
+      const L = [];
+      L.push('# 使用 cURL 测试接口（中文注释）');
+      L.push('curl -X '+m+' "'+base+p+'" \\');
+      L.push('  -H "Authorization: '+h['Authorization']+'" \\');
+      L.push('  -H "X-Client-Id: '+h['X-Client-Id']+'" \\');
+      L.push('  -H "X-Signature: '+h['X-Signature']+'" \\');
+      L.push('  -H "X-Timestamp: '+h['X-Timestamp']+'" \\');
+      if(m!=='GET' && body.trim()){ L.push("  -H 'Content-Type: application/json' \\"); L.push("  -d '"+body.replace(/'/g,"'\\''")+"'"); }
+      document.getElementById('snippet').textContent = L.join("\n");
+    }
+    function genJS(){
+      const base = document.getElementById('apiBase').value.trim();
+      const m = document.getElementById('httpMethod').value.trim();
+      const p = document.getElementById('apiPath').value.trim();
+      const body = document.getElementById('reqBody').value;
+      const sig = document.getElementById('signature').textContent.trim();
+      const ts  = document.getElementById('ts').value.trim();
+      const h = buildHeaders(sig, ts);
+      const L = [];
+      L.push('// 使用 fetch 发起请求（中文注释）');
+      L.push('const url = "'+base+p+'";');
+      L.push('const headers = {');
+      L.push('  "Authorization": "'+h['Authorization']+'",');
+      L.push('  "X-Client-Id": "'+h['X-Client-Id']+'",');
+      L.push('  "X-Signature": "'+h['X-Signature']+'",');
+      L.push('  "X-Timestamp": "'+h['X-Timestamp']+'"');
+      L.push('};');
+      L.push('const opts = { method: "'+m+'", headers, body: '+(m!=='GET'?'JSON.stringify('+ (body or '{}') +')':'undefined')+' };');
+      L.push('fetch(url, opts).then(r => r.json()).then(console.log).catch(console.error);');
+      document.getElementById('snippet').textContent = L.join("\n");
+    }
+    function genPy(){
+      const base = document.getElementById('apiBase').value.trim();
+      const m = document.getElementById('httpMethod').value.trim();
+      const p = document.getElementById('apiPath').value.trim();
+      const body = document.getElementById('reqBody').value;
+      const sig = document.getElementById('signature').textContent.trim();
+      const ts  = document.getElementById('ts').value.trim();
+      const h = buildHeaders(sig, ts);
+      const L = [];
+      L.push('# 使用 Python requests 发起请求（中文注释）');
+      L.push('import requests, json');
+      L.push('url = "'+base+p+'"');
+      L.push('headers = {');
+      L.push('  "Authorization": "'+h['Authorization']+'",');
+      L.push('  "X-Client-Id": "'+h['X-Client-Id']+'",');
+      L.push('  "X-Signature": "'+h['X-Signature']+'",');
+      L.push('  "X-Timestamp": "'+h['X-Timestamp']+'"');
+      L.push('}');
+      if(m!=='GET'){ L.push('data = '+(body or '{}')); L.push('res = requests.request("'+m+'", url, headers=headers, json=data)'); }
+      else{ L.push('res = requests.request("'+m+'", url, headers=headers)'); }
+      L.push('print(res.status_code, res.text)');
+      document.getElementById('snippet').textContent = L.join("\n");
+    }
+    document.getElementById('btnGenCurl').addEventListener('click', genCurl);
+    document.getElementById('btnGenJS').addEventListener('click', genJS);
+    document.getElementById('btnGenPy').addEventListener('click', genPy);
+
+    /* ========== Webhook 事件 & 白名单 & 审计日志 ========== */
+    const whSecretEl = document.getElementById('whSecret'); let whMasked=true;
+    function renderWh(){
+      const el = document.getElementById('whTable'); let html='';
+      model.webhookEvents.forEach(r=>{
+        html += '<tr><td>'+r.time+'</td><td>'+r.evt+'</td><td class="text-end">'+r.status+'</td><td class="text-end">'+r.ms+'</td></tr>';
+      });
+      el.innerHTML = html;
+    }
+    function renderIp(){
+      const el = document.getElementById('ipTable'); let html='';
+      model.ipWhitelist.forEach((ip, idx)=>{
+        html += '<tr><td>'+ip+'</td><td class="text-end"><button class="btn btn-sm btn-outline-danger" data-idx="'+idx+'">移除</button></td></tr>';
+      });
+      el.innerHTML = html;
+    }
+    function renderAudit(){
+      const el = document.getElementById('auditTable'); let html='';
+      model.audit.slice(0,50).forEach(r=>{
+        html += '<tr><td>'+r.time+'</td><td>'+r.action+'</td><td>'+r.result+'</td><td>'+r.actor+'</td></tr>';
+      });
+      el.innerHTML = html;
+    }
+    renderWh(); renderIp(); renderAudit();
+
+    document.getElementById('btnRevealWh').addEventListener('click', function(){ whMasked=!whMasked; whSecretEl.classList.toggle('mask', whMasked); this.textContent = whMasked?'显示':'隐藏'; });
+    document.getElementById('btnCopyWh').addEventListener('click', function(){ navigator.clipboard?.writeText(whSecretEl.textContent.trim()); });
+    document.getElementById('btnRotateWh').addEventListener('click', function(){
+      model.whSecret = 'whsec_'+Math.random().toString(36).slice(2)+'_'+Date.now().toString(36);
+      whSecretEl.textContent = model.whSecret; whSecretEl.classList.add('mask'); whMasked=true;
+      model.audit.unshift({time:new Date().toLocaleString(), action:'轮换 Webhook 密钥', result:'OK', actor:'Admin'});
+      renderAudit(); toast('Webhook 密钥已轮换');
+    });
+    document.getElementById('ipTable').addEventListener('click', function(e){
+      const btn = e.target.closest('button[data-idx]'); if(!btn) return;
+      const idx = parseInt(btn.getAttribute('data-idx'), 10);
+      model.ipWhitelist.splice(idx,1); renderIp();
+      model.audit.unshift({time:new Date().toLocaleString(), action:'移除 IP 白名单项', result:'OK', actor:'Admin'});
+      renderAudit(); toast('已移除白名单 IP');
+    });
+    document.getElementById('btnIpAdd').addEventListener('click', function(){
+      const ip = document.getElementById('ipNew').value.trim(); if(!ip) return;
+      model.ipWhitelist.push(ip); document.getElementById('ipNew').value=''; renderIp();
+      model.audit.unshift({time:new Date().toLocaleString(), action:'新增 IP 白名单项', result:'OK', actor:'Admin'});
+      renderAudit(); toast('已添加白名单 IP');
+    });
+    document.getElementById('btnReplay').addEventListener('click', function(){ alert('已触发“重试最近失败”的回调（演示）'); });
+    document.getElementById('btnSendTest').addEventListener('click', function(){ alert('已发送测试事件（演示）'); });
+
+    /* ========== 通知（Bootstrap 兜底） ========== */
+    document.addEventListener('DOMContentLoaded', function () {
+      const link = document.querySelector('[data-bs-target="#modalAllNotifications"]');
+      if(link){
+        link.addEventListener('click', function (e) {
+          e.preventDefault();
+          const modalEl = document.getElementById('modalAllNotifications');
+          if(!modalEl) return;
+          if(window.bootstrap && bootstrap.Modal){
+            const m = bootstrap.Modal.getOrCreateInstance(modalEl);
+            m.show();
+          }else{
+            // 无 Bootstrap 时，使用简单提示兜底
+            alert('通知：提现打款成功；任务通过率 92.1% 等（简化显示）');
+          }
+        });
+      }
+    });
+  </script>
+<script src="p1-unify.js"></script>
+<script src="p2-unify.js"></script>
+</body>
+</html>
+<script src="p1-unify.js"></script>
+<script src="p2-unify.js"></script>
+</body>
+</html>

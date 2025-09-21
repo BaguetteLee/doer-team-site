@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>任务接单平台·平台资金流水</title>
+  <!-- 统一依赖：Bootstrap / Icons / Chart.js -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root{
+      --primary:#3b7ddd; --primary-light:#e8f0fe; --secondary:#6c757d;
+      --red:#dc3545; --green:#28a745; --white:#fff; --light:#f5f6f8;
+      --dark:#343a40; --border:#e2e8f0;
+    }
+    body{ background:var(--light); color:#2d3748; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    .navbar{ background:var(--white); border-bottom:1px solid var(--border); box-shadow:0 2px 10px rgba(0,0,0,.05); position:fixed; top:0; left:0; right:0; z-index:1030; padding-left:250px;}
+    .navbar-brand{ color:var(--primary); font-weight:700; }
+    .sidebar{ background:var(--white); height:100vh; position:fixed; left:0; top:0; width:250px; padding-top:60px; border-right:1px solid var(--border); box-shadow:2px 0 10px rgba(0,0,0,.05); overflow-y:auto; z-index:1000;}
+    .sidebar .nav-link{ color:#4a5568; padding:.8rem 1rem; margin:.1rem .5rem; border-radius:6px; display:flex; align-items:center; transition:all .2s; }
+    .sidebar .nav-link i{ margin-right:10px; color:#718096; }
+    .sidebar .nav-link:hover, .sidebar .nav-link.active{ color:var(--primary); background:var(--primary-light); }
+    .sidebar .nav-link.active i, .sidebar .nav-link:hover i{ color:var(--primary); }
+    .nav-section{ margin:.75rem .25rem .25rem; font-size:.8125rem; color:#6c757d; display:flex; align-items:center; gap:.5rem; }
+    .nav-section .dot{ width:10px; height:10px; border-radius:2px; display:inline-block; }
+    .dot--platform{ background:#0d6efd; } .dot--task{ background:#20c997; } .dot--user{ background:#fd7e14; } .dot--settings{ background:#6f42c1; }
+    .main{ margin-left:250px; padding:20px; padding-top:80px; }
+    @media (max-width: 992px){
+      .sidebar{ width:80px; padding-top:70px; }
+      .sidebar .nav-link span{ display:none; }
+      .sidebar .nav-link i{ margin-right:0; font-size:1.2rem; }
+      .navbar{ padding-left:80px; }
+      .main{ margin-left:80px; }
+    }
+    @media (max-width: 768px){
+      .sidebar{ transform: translateX(-100%); width:250px; }
+      .sidebar.show{ transform: translateX(0); }
+      .navbar{ padding-left:15px; }
+      .main{ margin-left:0; }
+      .navbar-toggler{ display:block; }
+    }
+    .navbar-toggler{ display:none; border:none; font-size:1.25rem; }
+    .navbar-toggler:focus{ box-shadow:none; }
+
+    .dashboard-card{ background:var(--white); border:none; border-radius:10px; box-shadow:0 4px 6px rgba(0,0,0,.04); }
+    .card-header{ background:var(--white); border-bottom:1px solid var(--border); font-weight:600; padding:1rem 1.25rem; }
+    .card-body{ padding:1rem 1.25rem; }
+    .metric-sub{ font-size:.85rem; color:#6c757d; }
+    .metric-value{ font-size:1.6rem; font-weight:700; }
+    .table-sm td,.table-sm th{ padding:.4rem .5rem; vertical-align:middle; }
+    .text-mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    .btn{ border-radius:6px; font-weight:500; }
+  </style>
+<link rel="stylesheet" href="p1-unify.css"/>
+<link rel="stylesheet" href="p2-unify.css"/>
+
+<style>
+/* Keep the time column on one line and give it breathing room */
+table.table.table-sm th:last-child,
+table.table.table-sm td:last-child { white-space: nowrap; width: 180px; }
+</style>
+
+</head>
+<body>
+  <!-- 顶部导航（与接单平台仪表盘统一：铃铛+用户下拉） -->
+  <nav class="navbar navbar-expand-lg navbar-light">
+    <div class="container-fluid">
+      <button id="sidebarToggle" class="navbar-toggler" type="button"><span class="navbar-toggler-icon"></span></button>
+      <a class="navbar-brand" href="doer-team-analytics-dashboard.html">
+        <strong><i class="bi bi-lightning-charge me-2"></i>任务接单管理平台</strong>
+      </a>
+      <div class="collapse navbar-collapse">
+        <ul class="navbar-nav ms-auto me-4">
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" id="notifDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false" href="#">
+              <i class="bi bi-bell"></i><span class="badge bg-danger ms-1">3</span>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="#"><i class="bi bi-journal-text me-2"></i>有 2 条新资金流水记录</a></li>
+              <li><a class="dropdown-item" href="#"><i class="bi bi-cash-coin me-2"></i>2 笔总部信息服务费已结算</a></li>
+              <li><hr class="dropdown-divider"/></li>
+              <li><a class="dropdown-item" href="#" id="viewAllNotificationsDashboard"><i class="bi bi-list-ul me-2"></i>查看所有通知</a></li>
+            </ul>
+          </li>
+          <li class="nav-item dropdown ms-2">
+            <a class="nav-link dropdown-toggle d-flex align-items-center" data-bs-toggle="dropdown" href="#" role="button">
+              <i class="bi bi-person-circle me-2"></i> 接单管理员
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="doer-team-account-management.html"><i class="bi bi-person-gear me-2"></i>账号与安全</a></li>
+              <li><hr class="dropdown-divider"/></li>
+              <li><a class="dropdown-item" href="#"><i class="bi bi-box-arrow-right me-2"></i>退出</a></li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 侧边栏（与仪表盘一致；当前页高亮） -->
+  <aside class="sidebar">
+    <ul class="nav flex-column">
+      <li class="nav-section"><span class="dot dot--platform"></span><span>平台</span></li>
+      <li><a class="nav-link" href="doer-team-analytics-dashboard.html"><i class="bi bi-speedometer2 me-2"></i><span>平台总仪表盘</span></a></li>
+      <li><a class="nav-link active" href="doer-team-finance-platform-fund-flow.html"><i class="bi bi-cash-coin me-2"></i><span>平台资金流水</span></a></li>
+
+      <li class="nav-section"><span class="dot dot--task"></span><span>任务</span></li>
+      <li><a class="nav-link" href="doer-team-orders-situation.html"><i class="bi bi-cart-check me-2"></i><span>任务接单情况</span></a></li>
+      <li><a class="nav-link" href="doer-team-tasks-completion.html"><i class="bi bi-check2-circle me-2"></i><span>任务完成情况</span></a></li>
+      <li><a class="nav-link" href="doer-team-tasks-list.html"><i class="bi bi-list-task me-2"></i><span>可接任务列表</span></a></li>
+
+      <li class="nav-section"><span class="dot dot--user"></span><span>用户</span></li>
+      <li><a class="nav-link" href="doer-team-users-list.html"><i class="bi bi-people me-2"></i><span>平台用户列表</span></a></li>
+      <li><a class="nav-link" href="doer-team-finance-withdrawal-list.html"><i class="bi bi-bank me-2"></i><span>用户提现列表</span></a></li>
+      <li><a class="nav-link" href="doer-team-finance-user-fund-flow.html"><i class="bi bi-journal-text me-2"></i><span>用户资金流水</span></a></li>
+
+      <li class="nav-section"><span class="dot dot--settings"></span><span>设置</span></li>
+      <li><a class="nav-link" href="doer-team-settings-categories.html"><i class="bi bi-sliders me-2"></i><span>业务分类概览</span></a></li>
+      <li><a class="nav-link" href="doer-team-system-api-monitoring.html"><i class="bi bi-activity me-2"></i><span>接口管理监控</span></a></li>
+      <li><a class="nav-link" href="doer-team-finance-payment-account.html"><i class="bi bi-credit-card me-2"></i><span>支付账户设置</span></a></li>
+      <li><a class="nav-link" href="doer-team-account-management.html"><i class="bi bi-person-gear me-2"></i><span>账号管理设置</span></a></li>
+      <li><a class="nav-link" href="doer-team-team-profile.html"><i class="bi bi-building-gear me-2"></i><span>团队资料设置</span></a></li>
+    </ul>
+  </aside>
+
+  <!-- 主内容 -->
+  <main class="main">
+    <!-- 顶部时间范围按钮组 -->
+    <div class="row g-2 align-items-center mb-3">
+      <div class="col-auto">
+        <div id="topRange" class="btn-group btn-group-sm">
+          <button class="btn btn-outline-primary" data-range="d1" type="button">昨日</button>
+          <button class="btn btn-outline-primary" data-range="d7" type="button">七日</button>
+          <button class="btn btn-outline-primary active" data-range="d30" type="button">近30日</button>
+          <button class="btn btn-outline-primary" data-range="y1" type="button">近一年</button>
+          <button class="btn btn-outline-secondary" data-range="total" type="button">累计</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 三余额 KPI -->
+    <div class="row g-3 mb-2">
+      <div class="col-xxl-4 col-md-6">
+        <div class="dashboard-card card h-100">
+          <div class="card-body">
+            <div class="metric-sub">平台可用余额（实时）</div>
+            <div id="metricAvail" class="metric-value">¥ 0</div>
+            <div class="metric-sub text-muted small">期间变动：<span id="deltaAvail">¥ 0</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-xxl-4 col-md-6">
+        <div class="dashboard-card card h-100">
+          <div class="card-body">
+            <div class="metric-sub">平台冻结余额（实时）</div>
+            <div id="metricFrozen" class="metric-value">¥ 0</div>
+            <div class="metric-sub text-muted small">期间变动：<span id="deltaFrozen">¥ 0</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-xxl-4 col-md-6">
+        <div class="dashboard-card card h-100">
+          <div class="card-body">
+            <div class="metric-sub">平台收益余额（实时）</div>
+            <div id="metricProfit" class="metric-value">¥ 0</div>
+            <div class="metric-sub text-muted small">期间变动：<span id="deltaProfit">¥ 0</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 图表 -->
+    <div class="row g-3 mb-3">
+      <div class="col-lg-8">
+        <div class="dashboard-card card h-100">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span>三余额净变动趋势</span>
+            <div id="trendGroup" class="btn-group btn-group-sm">
+              <button class="btn btn-outline-secondary active" data-gran="day">按日</button>
+              <button class="btn btn-outline-secondary" data-gran="week">按周</button>
+              <button class="btn btn-outline-secondary" data-gran="month">按月</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <canvas id="trendChart" height="120"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-4">
+        <div class="dashboard-card card h-100">
+          <div class="card-header">期间净变动占比</div>
+          <div class="card-body">
+            <canvas id="pieChart" height="180"></canvas>
+            <div class="small text-muted mt-2">可用 / 冻结 / 收益三项净变动占比。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 筛选表单 -->
+    <div class="card p-3 mb-3 dashboard-card">
+      <form id="filterForm" class="row g-3 align-items-end">
+        <div class="col-md-4">
+          <label class="form-label small text-muted">业务类型</label>
+          <select id="fBiz" class="form-select form-select-sm"><option value="">全部</option></select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small text-muted">关联用户（接单）关键词</label>
+          <input id="fDoer" type="text" class="form-control form-control-sm" placeholder="如：接单用户A / 接单用户B"/>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small text-muted">时间范围</label>
+          <div class="d-flex gap-2">
+            <input id="fStart" type="date" class="form-control form-control-sm"/>
+            <input id="fEnd" type="date" class="form-control form-control-sm"/>
+          </div>
+        </div>
+        <div class="col-12 d-flex gap-2">
+          <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-filter"></i> 筛选</button>
+          <button id="btnReset" type="button" class="btn btn-outline-secondary btn-sm">重置</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- 流水列表（仅一个列表，翻页） -->
+    <div class="dashboard-card card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <div>
+          <span>平台资金流水（三余额变动）</span>
+          <span class="text-muted small ms-2">共 <span id="totalRows">0</span> 条</span>
+          <div class="small text-muted mt-1">口径说明：接单冻结→冻结余额增加；审核通过→冻结减少且“可用/收益”分别增加，并从收益支出总部信息服务费；审核不通过→冻结减少退回。</div>
+        </div>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table id="flowTable" class="table table-sm table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>流水号</th>
+                <th>任务ID</th>
+                <th>关联用户（接单）</th>
+                <th>业务类型</th>
+                <th>可用余额变动</th>
+                <th>冻结余额变动</th>
+                <th>平台收益余额变动</th>
+                <th style="width:150px;">时间</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyFlow"></tbody>
+          </table>
+        </div>
+        <div class="d-flex justify-content-between align-items-center p-2">
+          <div class="small text-muted">当前第 <span id="pageNo">1</span> / <span id="pageTotal">1</span> 页</div>
+          <nav><ul id="pager" class="pagination pagination-sm mb-0"></ul></nav>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- 查看全部通知模态 -->
+  <div class="modal fade" id="modalAllNotifications" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">全部通知</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+        </div>
+        <div class="modal-body">
+          <ul class="list-group">
+            <li class="list-group-item d-flex justify-content-between align-items-start">
+              <div class="ms-2 me-auto">
+                <div class="fw-normal">资金流水新增 3 条记录。</div>
+                <small class="text-muted">2 分钟前</small>
+              </div>
+            </li>
+            <li class="list-group-item d-flex justify-content-between align-items-start">
+              <div class="ms-2 me-auto">
+                <div class="fw-normal">总部信息服务费已结算 2 笔。</div>
+                <small class="text-muted">20 分钟前</small>
+              </div>
+            </li>
+            <li class="list-group-item d-flex justify-content-between align-items-start">
+              <div class="ms-2 me-auto">
+                <div class="fw-normal">DT6003 已审核通过并完成结算。</div>
+                <small class="text-muted">昨天 13:06</small>
+              </div>
+            </li>
+          </ul>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // ============================ 工具函数 ============================
+    function fmtMoney(n){
+      var sign = n < 0 ? '-' : '';
+      var v = Math.abs(n).toLocaleString('zh-CN',{ minimumFractionDigits:2, maximumFractionDigits:2 });
+      return sign + '¥ ' + v;
+    }
+    function fmtDelta(n){
+      return n===0 ? '<span class="text-muted">—</span>' :
+             (n>0 ? ('<span class="text-success">+'+fmtMoney(n).replace('¥ ','')+'</span>')
+                  : ('<span class="text-danger">'+fmtMoney(n).replace('¥ ','')+'</span>'));
+    }
+
+    // ============================ 新资金口径的模拟数据 ============================
+    // 说明：仅体现“本接单平台”的资金流；遵循以下事件：
+    // 1) 接单冻结赏金：冻结余额 + 总赏金
+    // 2) 审核通过-结算分配：冻结余额 - 总赏金；可用余额 + 用户应得；平台收益 + 平台应得
+    // 3) 总部信息服务费支出：平台收益 - 总部费
+    // 4) 审核不通过-解冻退回：冻结余额 - 总赏金
+    var DOC_ROWS = [{"serial": "D-DOC-1157", "biz": "总部信息服务费支出", "taskId": "DT6999", "doer": "接单用户Z", "avail_delta": 0.0, "frozen_delta": 0.0, "profit_delta": -7.2, "ts": "2025-09-19 12:16:00"}, {"serial": "D-DOC-1156", "biz": "审核通过-结算分配", "taskId": "DT6999", "doer": "接单用户Z", "avail_delta": 96.0, "frozen_delta": -120.0, "profit_delta": 24.0, "ts": "2025-09-19 12:15:00"}, {"serial": "D-DOC-1161", "biz": "审核不通过-解冻退回", "taskId": "DT6998", "doer": "接单用户Y", "avail_delta": 0.0, "frozen_delta": -60.0, "profit_delta": 0.0, "ts": "2025-09-19 12:05:00"}, {"serial": "D-DOC-1160", "biz": "总部信息服务费支出", "taskId": "DT6998", "doer": "接单用户Y", "avail_delta": 0.0, "frozen_delta": 0.0, "profit_delta": -8.4, "ts": "2025-09-19 12:01:00"}, {"serial": "D-DOC-1159", "biz": "审核通过-结算分配", "taskId": "DT6998", "doer": "接单用户Y", "avail_delta": 112.0, "frozen_delta": -140.0, "profit_delta": 28.0, "ts": "2025-09-19 12:00:00"}, {"serial": "D-DOC-1155", "biz": "接单冻结赏金", "taskId": "DT6999", "doer": "接单用户Z", "avail_delta": 0.0, "frozen_delta": 120.0, "profit_delta": 0.0, "ts": "2025-09-19 11:45:00"}, {"serial": "D-DOC-1158", "biz": "接单冻结赏金", "taskId": "DT6998", "doer": "接单用户Y", "avail_delta": 0.0, "frozen_delta": 200.0, "profit_delta": 0.0, "ts": "2025-09-19 11:15:00"}, {"serial": "D-DOC-1103", "biz": "总部信息服务费支出", "taskId": "DT6100", "doer": "接单用户A", "avail_delta": 0.0, "frozen_delta": 0.0, "profit_delta": -5.82, "ts": "2025-09-18 23:01:00"}, {"serial": "D-DOC-1102", "biz": "审核通过-结算分配", "taskId": "DT6100", "doer": "接单用户A", "avail_delta": 77.6, "frozen_delta": -97.0, "profit_delta": 19.4, "ts": "2025-09-18 23:00:00"}, {"serial": "D-DOC-1101", "biz": "接单冻结赏金", "taskId": "DT6100", "doer": "接单用户A", "avail_delta": 0.0, "frozen_delta": 97.0, "profit_delta": 0.0, "ts": "2025-09-18 22:30:00"}, {"serial": "D-DOC-1106", "biz": "总部信息服务费支出", "taskId": "DT6101", "doer": "接单用户D", "avail_delta": 0.0, "frozen_delta": 0.0, "profit_delta": -6.3, "ts": "2025-09-18 19:01:00"}, {"serial": "D-DOC-1105", "biz": "审核通过-结算分配", "taskId": "DT6101", "doer": "接单用户D", "avail_delta": 84.0, "frozen_delta": -105.0, "profit_delta": 21.0, "ts": "2025-09-18 19:00:00"}, {"serial": "D-DOC-1104", "biz": "接单冻结赏金", "taskId": "DT6101", "doer": "接单用户D", "avail_delta": 0.0, "frozen_delta": 105.0, "profit_delta": 0.0, "ts": "2025-09-18 18:30:00"}, {"serial": "D-DOC-1109", "biz": "总部信息服务费支出", "taskId": "DT6102", "doer": "接单用户D", "avail_delta": 0.0, "frozen_delta": 0.0, "profit_delta": -19.86, "ts": "2025-09-18 15:01:00"}, {"serial": "D-DOC-1108", "biz": "审核通过-结算分配", "taskId": "DT6102", "doer": "接单用户D", "avail_delta": 264.8, "frozen_delta": -331.0, "profit_delta": 66.2, "ts": "2025-09-18 15:00:00"}, {"serial": "D-DOC-1107", "biz": "接单冻结赏金", "taskId": "DT6102", "doer": "接单用户D", "avail_delta": 0.0, "frozen_delta": 331.0, "profit_delta": 0.0, "ts": "2025-09-18 14:30:00"}, {"serial": "D-DOC-1113", "biz": "审核不通过-解冻退回", "taskId": "DT6103", "doer": "接单用户G", "avail_delta": 0.0, "frozen_delta": -57.0, "profit_delta": 0.0, "ts": "2025-09-18 14:20:00"}, {"serial": "D-DOC-1112", "biz": "总部信息服务费支出", "taskId": "DT6103", "doer": "接单用户G", "avail_delta": 0.0, "frozen_delta": 0.0, "profit_delta": -5.16, "ts": "2025-09-18 14:16:00"}, {"serial": "D-DOC-1111", "biz": "审核通过-结算分配", "taskId": "DT6103", "doer": "接单用户G", "avail_delta": 68.8, "frozen_delta": -86.0, "profit_delta": 17.2, "ts": "2025-09-18 14:15:00"}, {"serial": "D-DOC-1110", "biz": "接单冻结赏金", "taskId": "DT6103", "doer": "接单用户G", "avail_delta": 0.0, "frozen_delta": 143.0, "profit_delta": 0.0, "ts": "2025-09-18 13:30:00"}, {"serial": "D-DOC-1117", "biz": "审核不通过-解冻退回", "taskId": "DT6104", "doer": "接单用户A", "avail_delta": 0.0, "frozen_delta": -25.0, "profit_delta": 0.0, "ts": "2025-09-18 10:20:00"}, {"serial": "D-DOC-1116", "biz": "总部信息服务费支出", "taskId": "DT6104", "doer": "接单用户A", "avail_delta": 0.0, "frozen_delta": 0.0, "profit_delta": -5.1, "ts": "2025-09-18 10:16:00"}, {"serial": "D-DOC-1115", "biz": "审核通过-结算分配", "taskId": "DT6104", "doer": "接单用户A", "avail_delta": 68.0, "frozen_delta": -85.0, "profit_delta": 17.0, "ts": "2025-09-18 10:15:00"}, {"serial": "D-DOC-1114", "biz": "接单冻结赏金", "taskId": "DT6104", "doer": "接单用户A", "avail_delta": 0.0, "frozen_delta": 110.0, "profit_delta": 0.0, "ts": "2025-09-18 09:30:00"}, {"serial": "D-DOC-1119", "biz": "审核不通过-解冻退回", "taskId": "DT6105", "doer": "接单用户C", "avail_delta": 0.0, "frozen_delta": -293.0, "profit_delta": 0.0, "ts": "2025-09-18 07:30:00"}, {"serial": "D-DOC-1118", "biz": "接单冻结赏金", "taskId": "DT6105", "doer": "接单用户C", "avail_delta": 0.0, "frozen_delta": 293.0, "profit_delta": 0.0, "ts": "2025-09-18 05:30:00"}, {"serial": "D-DOC-1122", "biz": "总部信息服务费支出", "taskId": "DT6106", "doer": "接单用户A", "avail_delta": 0.0, "frozen_delta": 0.0, "profit_delta": -19.74, "ts": "2025-09-18 04:01:00"}, {"serial": "D-DOC-1121", "biz": "审核通过-结算分配", "taskId": "DT6106", "doer": "接单用户A", "avail_delta": 263.2, "frozen_delta": -329.0, "profit_delta": 65.8, "ts": "2025-09-18 04:00:00"}, {"serial": "D-DOC-1120", "biz": "接单冻结赏金", "taskId": "DT6106", "doer": "接单用户A", "avail_delta": 0.0, "frozen_delta": 329.0, "profit_delta": 0.0, "ts": "2025-09-18 03:30:00"}, {"serial": "D-DOC-1126", "biz": "审核不通过-解冻退回", "taskId": "DT6107", "doer": "接单用户A", "avail_delta": 0.0, "frozen_delta": -80.0, "profit_delta": 0.0, "ts": "2025-09-18 01:20:00"}, {"serial": "D-DOC-1125", "biz": "总部信息服务费支出", "taskId": "DT6107", "doer": "接单用户A", "avail_delta": 0.0, "frozen_delta": 0.0, "profit_delta": -19.8, "ts": "2025-09-18 01:16:00"}, {"serial": "D-DOC-1124", "biz": "审核通过-结算分配", "taskId": "DT6107", "doer": "接单用户A", "avail_delta": 264.0, "frozen_delta": -330.0, "profit_delta": 66.0, "ts": "2025-09-18 01:15:00"}, {"serial": "D-DOC-1123", "biz": "接单冻结赏金", "taskId": "DT6107", "doer": "接单用户A", "avail_delta": 0.0, "frozen_delta": 410.0, "profit_delta": 0.0, "ts": "2025-09-18 00:30:00"}, {"serial": "D-DOC-1130", "biz": "审核不通过-解冻退回", "taskId": "DT6108", "doer": "接单用户F", "avail_delta": 0.0, "frozen_delta": -84.0, "profit_delta": 0.0, "ts": "2025-09-18 00:20:00"}, {"serial": "D-DOC-1129", "biz": "总部信息服务费支出", "taskId": "DT6108", "doer": "接单用户F", "avail_delta": 0.0, "frozen_delta": 0.0, "profit_delta": -6.12, "ts": "2025-09-18 00:16:00"}, {"serial": "D-DOC-1128", "biz": "审核通过-结算分配", "taskId": "DT6108", "doer": "接单用户F", "avail_delta": 81.6, "frozen_delta": -102.0, "profit_delta": 20.4, "ts": "2025-09-18 00:15:00"}, {"serial": "D-DOC-1127", "biz": "接单冻结赏金", "taskId": "DT6108", "doer": "接单用户F", "avail_delta": 0.0, "frozen_delta": 186.0, "profit_delta": 0.0, "ts": "2025-09-17 23:30:00"}, {"serial": "D-DOC-1133", "biz": "总部信息服务费支出", "taskId": "DT6109", "doer": "接单用户C", "avail_delta": 0.0, "frozen_delta": 0.0, "profit_delta": -26.4, "ts": "2025-09-17 21:01:00"}, {"serial": "D-DOC-1132", "biz": "审核通过-结算分配", "taskId": "DT6109", "doer": "接单用户C", "avail_delta": 352.0, "frozen_delta": -440.0, "profit_delta": 88.0, "ts": "2025-09-17 21:00:00"}, {"serial": "D-DOC-1131", "biz": "接单冻结赏金", "taskId": "DT6109", "doer": "接单用户C", "avail_delta": 0.0, "frozen_delta": 440.0, "profit_delta": 0.0, "ts": "2025-09-17 20:30:00"}, {"serial": "D-DOC-1139", "biz": "审核不通过-解冻退回", "taskId": "DT6111", "doer": "接单用户H", "avail_delta": 0.0, "frozen_delta": -411.0, "profit_delta": 0.0, "ts": "2025-09-17 18:30:00"}, {"serial": "D-DOC-1137", "biz": "审核不通过-解冻退回", "taskId": "DT6110", "doer": "接单用户G", "avail_delta": 0.0, "frozen_delta": -38.0, "profit_delta": 0.0, "ts": "2025-09-17 18:20:00"}, {"serial": "D-DOC-1136", "biz": "总部信息服务费支出", "taskId": "DT6110", "doer": "接单用户G", "avail_delta": 0.0, "frozen_delta": 0.0, "profit_delta": -1.62, "ts": "2025-09-17 18:16:00"}, {"serial": "D-DOC-1135", "biz": "审核通过-结算分配", "taskId": "DT6110", "doer": "接单用户G", "avail_delta": 21.6, "frozen_delta": -27.0, "profit_delta": 5.4, "ts": "2025-09-17 18:15:00"}, {"serial": "D-DOC-1134", "biz": "接单冻结赏金", "taskId": "DT6110", "doer": "接单用户G", "avail_delta": 0.0, "frozen_delta": 65.0, "profit_delta": 0.0, "ts": "2025-09-17 17:30:00"}, {"serial": "D-DOC-1138", "biz": "接单冻结赏金", "taskId": "DT6111", "doer": "接单用户H", "avail_delta": 0.0, "frozen_delta": 411.0, "profit_delta": 0.0, "ts": "2025-09-17 16:30:00"}, {"serial": "D-DOC-1143", "biz": "审核不通过-解冻退回", "taskId": "DT6112", "doer": "接单用户A", "avail_delta": 0.0, "frozen_delta": -25.0, "profit_delta": 0.0, "ts": "2025-09-17 13:20:00"}, {"serial": "D-DOC-1142", "biz": "总部信息服务费支出", "taskId": "DT6112", "doer": "接单用户A", "avail_delta": 0.0, "frozen_delta": 0.0, "profit_delta": -3.54, "ts": "2025-09-17 13:16:00"}, {"serial": "D-DOC-1141", "biz": "审核通过-结算分配", "taskId": "DT6112", "doer": "接单用户A", "avail_delta": 47.2, "frozen_delta": -59.0, "profit_delta": 11.8, "ts": "2025-09-17 13:15:00"}, {"serial": "D-DOC-1140", "biz": "接单冻结赏金", "taskId": "DT6112", "doer": "接单用户A", "avail_delta": 0.0, "frozen_delta": 84.0, "profit_delta": 0.0, "ts": "2025-09-17 12:30:00"}, {"serial": "D-DOC-1147", "biz": "审核不通过-解冻退回", "taskId": "DT6113", "doer": "接单用户A", "avail_delta": 0.0, "frozen_delta": -151.0, "profit_delta": 0.0, "ts": "2025-09-17 10:20:00"}, {"serial": "D-DOC-1146", "biz": "总部信息服务费支出", "taskId": "DT6113", "doer": "接单用户A", "avail_delta": 0.0, "frozen_delta": 0.0, "profit_delta": -8.46, "ts": "2025-09-17 10:16:00"}, {"serial": "D-DOC-1145", "biz": "审核通过-结算分配", "taskId": "DT6113", "doer": "接单用户A", "avail_delta": 112.8, "frozen_delta": -141.0, "profit_delta": 28.2, "ts": "2025-09-17 10:15:00"}, {"serial": "D-DOC-1144", "biz": "接单冻结赏金", "taskId": "DT6113", "doer": "接单用户A", "avail_delta": 0.0, "frozen_delta": 292.0, "profit_delta": 0.0, "ts": "2025-09-17 09:30:00"}, {"serial": "D-DOC-1150", "biz": "总部信息服务费支出", "taskId": "DT6114", "doer": "接单用户D", "avail_delta": 0.0, "frozen_delta": 0.0, "profit_delta": -29.34, "ts": "2025-09-17 05:01:00"}, {"serial": "D-DOC-1149", "biz": "审核通过-结算分配", "taskId": "DT6114", "doer": "接单用户D", "avail_delta": 391.2, "frozen_delta": -489.0, "profit_delta": 97.8, "ts": "2025-09-17 05:00:00"}, {"serial": "D-DOC-1148", "biz": "接单冻结赏金", "taskId": "DT6114", "doer": "接单用户D", "avail_delta": 0.0, "frozen_delta": 489.0, "profit_delta": 0.0, "ts": "2025-09-17 04:30:00"}, {"serial": "D-DOC-1154", "biz": "审核不通过-解冻退回", "taskId": "DT6115", "doer": "接单用户E", "avail_delta": 0.0, "frozen_delta": -272.0, "profit_delta": 0.0, "ts": "2025-09-17 03:20:00"}, {"serial": "D-DOC-1153", "biz": "总部信息服务费支出", "taskId": "DT6115", "doer": "接单用户E", "avail_delta": 0.0, "frozen_delta": 0.0, "profit_delta": -11.4, "ts": "2025-09-17 03:16:00"}, {"serial": "D-DOC-1152", "biz": "审核通过-结算分配", "taskId": "DT6115", "doer": "接单用户E", "avail_delta": 152.0, "frozen_delta": -190.0, "profit_delta": 38.0, "ts": "2025-09-17 03:15:00"}, {"serial": "D-DOC-1151", "biz": "接单冻结赏金", "taskId": "DT6115", "doer": "接单用户E", "avail_delta": 0.0, "frozen_delta": 462.0, "profit_delta": 0.0, "ts": "2025-09-17 02:30:00"}];
+
+    // ============================ 状态与初始化 ============================
+    var state = { pageSize:12, page:1, range:'d30', granularity:'day', rows:DOC_ROWS, filtered:[] };
+
+    // 业务类型下拉
+    (function initBizOptions(){
+      var set={}, sel=document.getElementById('fBiz');
+      for(var i=0;i<state.rows.length;i++){ set[state.rows[i].biz]=1; }
+      Object.keys(set).forEach(function(k){ var o=document.createElement('option'); o.value=k; o.textContent=k; sel.appendChild(o); });
+    })();
+
+    // 实时余额演示基数（真实项目以后端返回为准）
+    var BASE = { avail: 1500000, frozen: 200000, profit: 120000 };
+    function computeRealtimeBalances(all){
+      var a=BASE.avail, f=BASE.frozen, p=BASE.profit;
+      for(var i=0;i<all.length;i++){ var r=all[i]; a+=(r.avail_delta||0); f+=(r.frozen_delta||0); p+=(r.profit_delta||0); }
+      return { a:a, f:f, p:p };
+    }
+
+    // 时间范围过滤
+    function rangeDays(tag){ if(tag==='d1')return 1; if(tag==='d7')return 7; if(tag==='d30')return 30; if(tag==='y1')return 365; return null; }
+    function withinRange(ts, tag){
+      var days=rangeDays(tag); if(!days) return true;
+      var now=new Date(); var from=new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      var start=new Date(from.getTime()-(days-1)*86400000); var d=new Date(ts);
+      return d>=start && d<=now;
+    }
+
+    // 过滤 + 渲染
+    function applyFilter(){
+      var biz=document.getElementById('fBiz').value;
+      var doer=(document.getElementById('fDoer').value||'').trim();
+      var s=document.getElementById('fStart').value ? new Date(document.getElementById('fStart').value+'T00:00:00') : null;
+      var e=document.getElementById('fEnd').value ? new Date(document.getElementById('fEnd').value+'T23:59:59') : null;
+
+      state.filtered = state.rows.filter(function(r){
+        if(biz && r.biz!==biz) return false;
+        if(doer && !(r.doer||'').includes(doer)) return false;
+        var dt=new Date(r.ts);
+        if(s && dt<s) return false;
+        if(e && dt>e) return false;
+        if(!withinRange(r.ts, state.range)) return false;
+        return true;
+      }).sort(function(a,b){ return new Date(b.ts) - new Date(a.ts); });
+
+      renderRealtime();
+      renderTable();
+      renderCharts();
+      renderPeriodDeltas();
+    }
+
+    function renderRealtime(){
+      var bal=computeRealtimeBalances(state.rows);
+      document.getElementById('metricAvail').textContent = fmtMoney(bal.a);
+      document.getElementById('metricFrozen').textContent = fmtMoney(bal.f);
+      document.getElementById('metricProfit').textContent = fmtMoney(bal.p);
+    }
+    function renderPeriodDeltas(){
+      var da=0, df=0, dp=0;
+      for(var i=0;i<state.filtered.length;i++){ var r=state.filtered[i]; da+=(r.avail_delta||0); df+=(r.frozen_delta||0); dp+=(r.profit_delta||0); }
+      document.getElementById('deltaAvail').textContent = fmtMoney(da);
+      document.getElementById('deltaFrozen').textContent = fmtMoney(df);
+      document.getElementById('deltaProfit').textContent = fmtMoney(dp);
+    }
+
+    // 表格 + 翻页
+    function rowHTML(r){
+      var task = r.taskId ? r.taskId : '<span class="text-muted">—</span>';
+      var user = r.doer ? r.doer : '<span class="text-muted">—</span>';
+      return '<tr>'
+        + '<td class="text-mono">'+r.serial+'</td>'
+        + '<td class="text-mono">'+task+'</td>'
+        + '<td>'+user+'</td>'
+        + '<td>'+r.biz+'</td>'
+        + '<td>'+fmtDelta(r.avail_delta||0)+'</td>'
+        + '<td>'+fmtDelta(r.frozen_delta||0)+'</td>'
+        + '<td>'+fmtDelta(r.profit_delta||0)+'</td>'
+        + '<td class="text-mono">'+r.ts+'</td>'
+        + '</tr>';
+    }
+    function renderTable(){
+      var start=(state.page-1)*state.pageSize;
+      var pageRows=state.filtered.slice(start, start+state.pageSize);
+      var html='';
+      if(pageRows.length){ for(var i=0;i<pageRows.length;i++) html+=rowHTML(pageRows[i]); }
+      else{ html = '<tr><td colspan="8" class="text-center py-4 text-muted">暂无数据</td></tr>'; }
+      document.getElementById('tbodyFlow').innerHTML = html;
+      document.getElementById('totalRows').textContent = state.filtered.length;
+
+      var totalPage=Math.max(1, Math.ceil(state.filtered.length/state.pageSize));
+      document.getElementById('pageNo').textContent = state.page;
+      document.getElementById('pageTotal').textContent = totalPage;
+
+      var items=[];
+      function li(disabled,active,label,page){ return '<li class="page-item '+(disabled?'disabled':'')+' '+(active?'active':'')+'"><a class="page-link" href="#" data-page="'+(page||'')+'">'+label+'</a></li>'; }
+      items.push(li(state.page<=1,false,'«',state.page-1));
+      for(var p=1;p<=totalPage;p++){
+        if(p===1||p===totalPage||Math.abs(p-state.page)<=1){ items.push(li(false,p===state.page,String(p),p)); }
+        else if(items[items.length-1] !== '...'){ items.push('<li class="page-item disabled"><span class="page-link">…</span></li>'); }
+      }
+      items.push(li(state.page>=totalPage,false,'»',state.page+1));
+      document.getElementById('pager').innerHTML = items.join('');
+    }
+
+    // 图表
+    var trendChart, pieChart;
+    function groupBy(rows, gran){
+      function bucketKey(d){
+        var y=d.getFullYear(), m=('0'+(d.getMonth()+1)).slice(-2), day=('0'+d.getDate()).slice(-2);
+        if(gran==='month') return y+'-'+m;
+        if(gran==='week'){
+          var oneJan=new Date(y,0,1); var numberOfDays=Math.floor((d-oneJan)/86400000);
+          var week=Math.ceil((numberOfDays + oneJan.getDay()+1)/7);
+          return y+'-W'+week;
+        }
+        return y+'-'+m+'-'+day;
+      }
+      var map={};
+      for(var i=0;i<rows.length;i++){
+        var r=rows[i], d=new Date(r.ts), k=bucketKey(d);
+        if(!map[k]) map[k]={ a:0, f:0, p:0 };
+        map[k].a += (r.avail_delta||0);
+        map[k].f += (r.frozen_delta||0);
+        map[k].p += (r.profit_delta||0);
+      }
+      var labels=Object.keys(map).sort();
+      return { labels:labels, a:labels.map(k=>map[k].a), f:labels.map(k=>map[k].f), p:labels.map(k=>map[k].p) };
+    }
+    function arrSum(a){ var s=0; for(var i=0;i<a.length;i++) s+=a[i]||0; return s; }
+    function renderCharts(){
+      if(typeof Chart==='undefined') return;
+      var g=groupBy(state.filtered, state.granularity);
+      if(trendChart) trendChart.destroy();
+      if(pieChart) pieChart.destroy();
+      trendChart = new Chart(document.getElementById('trendChart'), {
+        type:'line',
+        data:{ labels:g.labels, datasets:[
+          { label:'可用余额变动', data:g.a, tension:.3 },
+          { label:'冻结余额变动', data:g.f, tension:.3 },
+          { label:'平台收益余额变动', data:g.p, tension:.3 }
+        ]},
+        options:{ responsive:true, plugins:{ legend:{ position:'top' } }, scales:{ y:{ beginAtZero:true } } }
+      });
+      pieChart = new Chart(document.getElementById('pieChart'), {
+        type:'pie',
+        data:{ labels:['可用','冻结','收益'], datasets:[{ data:[arrSum(g.a), arrSum(g.f), arrSum(g.p)] }] },
+        options:{ responsive:true }
+      });
+    }
+
+    // 交互绑定
+    document.getElementById('pager').addEventListener('click', function(e){
+      var a=e.target.closest?e.target.closest('a.page-link'):null; if(!a) return; e.preventDefault();
+      var p=parseInt(a.getAttribute('data-page'),10); var total=Math.max(1, Math.ceil(state.filtered.length/state.pageSize));
+      if(!isNaN(p) && p>=1 && p<=total){ state.page=p; renderTable(); }
+    });
+    document.getElementById('topRange').addEventListener('click', function(e){
+      var btn=e.target.closest?e.target.closest('button[data-range]'):null; if(!btn) return;
+      this.querySelectorAll('button').forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active'); state.range=btn.getAttribute('data-range'); state.page=1; applyFilter();
+    });
+    document.getElementById('trendGroup').addEventListener('click', function(e){
+      var btn=e.target.closest?e.target.closest('button[data-gran]'):null; if(!btn) return;
+      this.querySelectorAll('button').forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active'); state.granularity=btn.getAttribute('data-gran'); renderCharts();
+    });
+    document.getElementById('filterForm').addEventListener('submit', function(e){ e.preventDefault(); state.page=1; applyFilter(); });
+    document.getElementById('btnReset').addEventListener('click', function(){
+      document.getElementById('fBiz').value=''; document.getElementById('fDoer').value='';
+      document.getElementById('fStart').value=''; document.getElementById('fEnd').value='';
+      state.page=1; applyFilter();
+    });
+    document.getElementById('sidebarToggle').addEventListener('click', function(){ document.querySelector('.sidebar').classList.toggle('show'); });
+
+    // 查看所有通知
+    document.addEventListener('DOMContentLoaded', function(){
+      var el=document.getElementById('viewAllNotificationsDashboard');
+      if(el){ el.addEventListener('click', function(e){ e.preventDefault(); var mEl=document.getElementById('modalAllNotifications'); if(mEl){ bootstrap.Modal.getOrCreateInstance(mEl).show(); } }); }
+    });
+
+    // 启动
+    (function init(){ applyFilter(); })();
+  </script>
+<script src="p1-unify.js"></script>
+<script src="p2-unify.js"></script>
+</body>
+</html>

@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>任务接单平台·账号管理设置</title>
+  <!-- 依赖（与 doer 团队端保持一致） -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet"/>
+  <style>
+    :root {
+      --primary: #3b7ddd;
+      --primary-light: #e8f0fe;
+      --secondary: #6c757d;
+      --red: #dc3545;
+      --red-light: #fde8ea;
+      --green: #28a745;
+      --green-light: #e8f5e9;
+      --white: #ffffff;
+      --light: #f8f9fa;
+      --dark: #343a40;
+      --border: #e2e8f0;
+    }
+    body { background-color: #f5f6f8; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #2d3748; }
+    /* ===== 侧边栏 / 顶部栏骨架（严格沿用 doer-dashboard） ===== */
+    .sidebar {
+      background-color: var(--white); color: #4a5568; height: 100vh; position: fixed; left: 0; top: 0; width: 250px;
+      padding-top: 60px; box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05); border-right: 1px solid var(--border); z-index: 1000; overflow-y: auto;
+    }
+    .sidebar .nav-link { color: #4a5568; padding: 0.8rem 1rem; margin: 0.1rem 0.5rem; border-radius: 6px; transition: all 0.2s; display:flex; align-items:center; }
+    .sidebar .nav-link:hover, .sidebar .nav-link.active { color: var(--primary); background-color: var(--primary-light); }
+    .sidebar .nav-link i { margin-right: 10px; color: #718096; }
+    .sidebar .nav-link.active i, .sidebar .nav-link:hover i { color: var(--primary); }
+    .main-content { margin-left: 250px; padding: 20px; padding-top: 80px; transition: margin-left 0.3s; }
+    .navbar {
+      background-color: var(--white); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05); border-bottom: 1px solid var(--border);
+      position: fixed; top: 0; left: 0; right: 0; z-index: 1030; padding-left: 250px; transition: padding-left 0.3s;
+    }
+    .navbar-brand { color: var(--primary); font-weight: 700; }
+    .dropdown-menu { border-radius: 8px; box-shadow: 0 10px 15px rgba(0,0,0,.08); border: 1px solid var(--border); }
+    .dropdown-item { padding:.5rem 1rem; border-radius:4px; margin:.1rem .5rem; width:auto; }
+
+    /* 侧边栏分组点（与 doer-dashboard 一致） */
+    #doer-doctheme-enhance .nav-section{ margin:.75rem .25rem .25rem; font-size:.8125rem; color:#6c757d; display:flex; align-items:center; gap:.5rem; }
+    #doer-doctheme-enhance .nav-section .dot{ width:10px; height:10px; border-radius:2px; display:inline-block; }
+    #doer-doctheme-enhance .dot--platform{ background:#0d6efd; }
+    #doer-doctheme-enhance .dot--task{ background:#20c997; }
+    #doer-doctheme-enhance .dot--user{ background:#fd7e14; }
+    #doer-doctheme-enhance .dot--settings{ background:#6f42c1; }
+    :root{ --sidebar-active-bg: rgba(13,110,253,.10); --sidebar-active:#0d6efd; }
+    .sidebar .nav-link.active{ color:var(--sidebar-active); background:var(--sidebar-active-bg); font-weight:600; }
+
+    /* ===== 页面自身样式（源自 pub-team-account-management，且中文注释） ===== */
+    .card{ border-radius:12px; box-shadow:0 6px 18px rgba(0,0,0,.04); border: none; }
+    h5,h6{ color:#2d3748; font-weight:600; }
+    .kv{ display:flex; gap:8px; align-items:center; color:#6b7280; }
+    .kv .v{ color:#0d6efd; font-weight:700; }
+    .badge-on{ background:#e8f5e9; color:#2e7d32; }
+    .badge-off{ background:#fde8ea; color:#c62828; }
+    .avatar{ width:72px; height:72px; border-radius:50%; background:#e9efff; display:flex; align-items:center; justify-content:center; color:#0d6efd; font-size:2rem; }
+    .nav-tabs .nav-link{ border-radius:8px 8px 0 0; }
+    .nav-tabs .nav-link.active{ color:#0d6efd !important; }
+    .strength{ height:8px; background:#e5e7eb; border-radius:999px; overflow:hidden; }
+    .strength > div{ height:100%; width:0; transition: width .2s; }
+    .strength.w1 > div{ width:25%; background:#ef4444; }
+    .strength.w2 > div{ width:50%; background:#f59e0b; }
+    .strength.w3 > div{ width:75%; background:#22c55e; }
+    .strength.w4 > div{ width:100%; background:#0ea5e9; }
+
+    /* Toast 容器 */
+    #toastBox{ position: fixed; right: 16px; bottom: 16px; z-index: 2000; }
+
+    /* 响应式（沿用 doer-dashboard） */
+    @media (max-width: 992px) {
+      .sidebar { width: 80px; padding-top: 70px; }
+      .sidebar .nav-link span { display: none; }
+      .sidebar .nav-link i { margin-right: 0; font-size: 1.2rem; }
+      .main-content { margin-left: 80px; }
+      .navbar { padding-left: 80px; }
+    }
+    @media (max-width: 768px) {
+      .sidebar { transform: translateX(-100%); width: 250px; }
+      .sidebar.show { transform: translateX(0); }
+      .main-content { margin-left: 0; }
+      .navbar { padding-left: 15px; }
+      .navbar-toggler { display: block; }
+    }
+    .navbar-toggler { display: none; border: none; font-size: 1.25rem; }
+    .navbar-toggler:focus { box-shadow: none; }
+  </style>
+<link rel="stylesheet" href="p1-unify.css"/>
+<link rel="stylesheet" href="p2-unify.css"/>
+</head>
+<body>
+  <!-- 顶部状态栏（严格按 doer-dashboard） -->
+  <nav class="navbar navbar-expand-lg navbar-light">
+    <div class="container-fluid">
+      <button class="navbar-toggler" id="sidebarToggle" type="button">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <a class="navbar-brand" href="#"><strong><i class="bi bi-lightning-charge me-2"></i>任务接单管理平台</strong></a>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ms-auto me-5">
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              <i class="bi bi-bell"></i>
+              <span class="badge bg-danger">3</span>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="#"><i class="bi bi-plus-circle me-2"></i>5个新任务可接单</a></li>
+              <li><a class="dropdown-item" href="#"><i class="bi bi-cash-coin me-2"></i>2个提现申请待处理</a></li>
+              <li><hr class="dropdown-divider"/></li>
+              <!-- 添加 id 以触发“查看全部通知”模态（与站内统一脚本兼容） -->
+              <li><a class="dropdown-item" href="#" id="viewAllNotifications"><i class="bi bi-list-ul me-2"></i>查看所有通知</a></li>
+            </ul>
+          </li>
+          <li class="nav-item dropdown ms-2">
+            <a class="nav-link dropdown-toggle d-flex align-items-center" id="userDropdown" role="button" data-bs-toggle="dropdown">
+              <i class="bi bi-person-circle me-2"></i> 接单管理员
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="#"><i class="bi bi-person me-2"></i>个人资料</a></li>
+              <li><a class="dropdown-item" href="#"><i class="bi bi-gear me-2"></i>设置</a></li>
+              <li><hr class="dropdown-divider"/></li>
+              <li><a class="dropdown-item" href="#"><i class="bi bi-box-arrow-right me-2"></i>退出</a></li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 侧边栏（严格按 doer-dashboard，且 active 在本页） -->
+  <div class="sidebar" id="doer-doctheme-enhance">
+    <div class="position-sticky">
+      <ul class="nav flex-column">
+        <!-- 平台 -->
+        <li class="nav-section"><span class="dot dot--platform"></span><span>平台</span></li>
+        <li class="nav-item"><a class="nav-link" href="doer-team-analytics-dashboard.html"><i class="bi bi-speedometer2 me-2"></i> <span>平台总仪表盘</span></a></li>
+        <li><a class="nav-link" href="doer-team-finance-platform-fund-flow.html"><i class="bi bi-cash-coin me-2"></i> <span>平台资金流水</span></a></li>
+        <!-- 任务 -->
+        <li class="nav-section"><span class="dot dot--task"></span><span>任务</span></li>
+        <li><a class="nav-link" href="doer-team-orders-situation.html"><i class="bi bi-cart-check me-2"></i> <span>任务接单情况</span></a></li>
+        <li><a class="nav-link" href="doer-team-tasks-completion.html"><i class="bi bi-check2-circle me-2"></i> <span>任务完成情况</span></a></li>
+        <li><a class="nav-link" href="doer-team-tasks-list.html"><i class="bi bi-list-task me-2"></i> <span>可接任务列表</span></a></li>
+        <!-- 用户 -->
+        <li class="nav-section"><span class="dot dot--user"></span><span>用户</span></li>
+        <li><a class="nav-link" href="doer-team-users-list.html"><i class="bi bi-people me-2"></i> <span>平台用户列表</span></a></li>
+        <li><a class="nav-link" href="doer-team-finance-withdrawal-list.html"><i class="bi bi-bank me-2"></i> <span>用户提现列表</span></a></li>
+        <li><a class="nav-link" href="doer-team-finance-user-fund-flow.html"><i class="bi bi-journal-text me-2"></i> <span>用户资金流水</span></a></li>
+        <!-- 设置 -->
+        <li class="nav-section"><span class="dot dot--settings"></span><span>设置</span></li>
+        <li><a class="nav-link" href="doer-team-settings-categories.html"><i class="bi bi-sliders me-2"></i> <span>业务分类概览</span></a></li>
+        <li><a class="nav-link" href="doer-team-system-api-monitoring.html"><i class="bi bi-activity me-2"></i> <span>接口管理监控</span></a></li>
+        <li><a class="nav-link" href="doer-team-finance-payment-account.html"><i class="bi bi-credit-card me-2"></i> <span>支付账户设置</span></a></li>
+        <li><a class="nav-link active" href="doer-team-account-management.html"><i class="bi bi-person-gear me-2"></i> <span>账号管理设置</span></a></li>
+        <li><a class="nav-link" href="doer-team-team-profile.html"><i class="bi bi-building-gear me-2"></i> <span>团队资料设置</span></a></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 主内容区（内容按 pub-team-account-management 设计，但移除邮箱） -->
+  <main class="main-content">
+    <div class="container-fluid">
+      <!-- 标题与登录信息 -->
+      <div class="row mb-2 align-items-center">
+        <div class="col">
+          <h5 class="mb-1">账号管理</h5>
+          <div class="text-muted small">管理当前管理员的个人信息、安全设置、手机号绑定以及登录设备。</div>
+        </div>
+        <div class="col-auto">
+          <span class="text-muted small">最后登录：<span id="lastLogin">—</span></span>
+        </div>
+      </div>
+
+      <!-- 资料卡 -->
+      <div class="card mb-3">
+        <div class="card-body d-flex align-items-center gap-3">
+          <div class="avatar"><i class="bi bi-person"></i></div>
+          <div class="flex-grow-1">
+            <div class="h6 mb-1"><span id="profName">—</span> <span class="badge text-bg-light">管理员</span></div>
+            <!-- 仅保留手机（按用户要求取消邮箱内容） -->
+            <div class="kv"><i class="bi bi-phone"></i><span>手机</span><span class="v" id="profPhone">—</span></div>
+          </div>
+          <div class="text-end">
+            <div class="text-muted small">2FA（双重验证）</div>
+            <div id="prof2FA"><span class="badge badge-off">未开启</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 选项卡：基本信息 / 安全设置 / 手机号 / 登录与设备 -->
+      <ul class="nav nav-tabs mb-3" id="tabs" role="tablist">
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#pane-profile" type="button">基本信息</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-security" type="button">安全设置</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-phone" type="button">手机号</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-sessions" type="button">登录与设备</button></li>
+      </ul>
+
+      <div class="tab-content">
+        <!-- 基本信息 -->
+        <div class="tab-pane fade show active" id="pane-profile">
+          <div class="card"><div class="card-body">
+            <form class="row g-3" id="formProfile">
+              <div class="col-12 col-md-4">
+                <label class="form-label">用户名</label>
+                <input id="pfUsername" class="form-control" disabled/>
+                <div class="form-text">创建后不可修改</div>
+              </div>
+              <div class="col-12 col-md-4">
+                <label class="form-label">姓名</label>
+                <input id="pfName" class="form-control" placeholder="请输入姓名"/>
+              </div>
+              <div class="col-12 col-md-4">
+                <label class="form-label">部门</label>
+                <select id="pfDept" class="form-select">
+                  <option>技术部</option><option>运营部</option><option>财务部</option><option>市场部</option>
+                </select>
+              </div>
+              <div class="col-12">
+                <label class="form-label">个人简介</label>
+                <textarea id="pfBio" class="form-control" rows="3" placeholder="请输入个人简介"></textarea>
+              </div>
+              <div class="col-12 d-flex justify-content-end">
+                <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>保存基本信息</button>
+              </div>
+            </form>
+          </div></div>
+        </div>
+
+        <!-- 安全设置 -->
+        <div class="tab-pane fade" id="pane-security">
+          <div class="card"><div class="card-body">
+            <form class="row g-3" id="formSecurity">
+              <div class="col-12 col-md-4">
+                <label class="form-label">当前密码</label>
+                <input id="scCur" type="password" class="form-control" placeholder="请输入当前密码"/>
+              </div>
+              <div class="col-12 col-md-4">
+                <label class="form-label">新密码</label>
+                <input id="scNew" type="password" class="form-control" placeholder="至少8位，含字母与数字"/>
+                <div id="pwStrength" class="strength mt-2"><div></div></div>
+              </div>
+              <div class="col-12 col-md-4">
+                <label class="form-label">确认新密码</label>
+                <input id="scNew2" type="password" class="form-control" placeholder="请再次输入新密码"/>
+              </div>
+              <div class="col-12">
+                <div class="form-check">
+                  <input id="sc2FA" type="checkbox" class="form-check-input"/>
+                  <label class="form-check-label" for="sc2FA">启用双重验证（登录需短信验证码）</label>
+                </div>
+              </div>
+              <div class="col-12 d-flex justify-content-end">
+                <button type="submit" class="btn btn-primary"><i class="bi bi-shield-lock me-1"></i>更新安全设置</button>
+              </div>
+            </form>
+          </div></div>
+        </div>
+
+        <!-- 手机号（仅保留手机号管理，完全移除邮箱模块） -->
+        <div class="tab-pane fade" id="pane-phone">
+          <div class="card"><div class="card-body">
+            <form class="row g-3" id="formPhone">
+              <div class="col-12 col-md-4">
+                <label class="form-label">当前手机号</label>
+                <input id="phCur" class="form-control" disabled/>
+              </div>
+              <div class="col-12 col-md-4">
+                <label class="form-label">新手机号</label>
+                <input id="phNew" class="form-control" placeholder="请输入新手机号"/>
+              </div>
+              <div class="col-12 col-md-4">
+                <label class="form-label">验证码</label>
+                <div class="input-group">
+                  <input id="phCode" class="form-control" placeholder="6位数字"/>
+                  <button id="phSend" class="btn btn-outline-secondary" type="button">发送验证码</button>
+                </div>
+              </div>
+              <div class="col-12 d-flex justify-content-end">
+                <button type="submit" class="btn btn-primary"><i class="bi bi-phone me-1"></i>更换手机号</button>
+              </div>
+            </form>
+          </div></div>
+        </div>
+
+        <!-- 登录与设备 -->
+        <div class="tab-pane fade" id="pane-sessions">
+          <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <div>登录设备与会话</div>
+              <button id="btnLogoutOthers" class="btn btn-outline-danger btn-sm"><i class="bi bi-box-arrow-right me-1"></i>注销其它设备</button>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-sm align-middle mb-0" id="tblSessions">
+                <thead class="table-light">
+                  <tr>
+                    <th>设备/浏览器</th>
+                    <th>IP / 位置</th>
+                    <th>最近活动</th>
+                    <th>状态</th>
+                    <th class="text-end">操作</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <div id="sessEmpty" class="placeholder-muted small p-3" style="display:none;">暂无会话。</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Toast 容器 -->
+  <div id="toastBox"></div>
+
+  <!-- 通知模态框（与站内统一） -->
+  <div class="modal fade" id="modalAllNotifications" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">全部通知</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+        </div>
+        <div class="modal-body">
+          <ul class="list-group">
+            <li class="list-group-item d-flex justify-content-between align-items-start">
+              <div class="ms-2 me-auto">
+                <div class="fw-normal">任务 #D250916-112 提交完成凭证，待审核。</div>
+                <small class="text-muted">2 分钟前</small>
+              </div>
+            </li>
+            <li class="list-group-item d-flex justify-content-between align-items-start">
+              <div class="ms-2 me-auto">
+                <div class="fw-normal">用户 U-99510 余额调整：后台充值 ¥100.00。</div>
+                <small class="text-muted">10 分钟前</small>
+              </div>
+            </li>
+            <li class="list-group-item d-flex justify-content-between align-items-start">
+              <div class="ms-2 me-auto">
+                <div class="fw-normal">任务 #D250915-006 进入异议处理中。</div>
+                <small class="text-muted">30 分钟前</small>
+              </div>
+            </li>
+            <li class="list-group-item d-flex justify-content-between align-items-start">
+              <div class="ms-2 me-auto">
+                <div class="fw-normal">系统例行备份完成，共 2 份增量。</div>
+                <small class="text-muted">今天 03:12</small>
+              </div>
+            </li>
+          </ul>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 依赖脚本 -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    /* ========== 工具函数（中文注释） ========== */
+    const today = new Date('2025-09-18T12:00:00'); // 固定演示时间
+    const fmtTime = (d)=> new Date(d).toISOString().slice(0,19).replace('T',' ');
+    function toast(msg,type='success'){
+      const w = document.createElement('div');
+      w.className = 'toast align-items-center text-bg-' + (type==='success'?'success':type==='danger'?'danger':'secondary') + ' border-0 show';
+      w.role = 'alert'; w.ariaLive = 'assertive'; w.ariaAtomic = 'true';
+      w.style.marginTop = '8px';
+      w.innerHTML = '<div class="d-flex"><div class="toast-body">'+msg+'</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div>';
+      document.getElementById('toastBox').appendChild(w);
+      setTimeout(()=> w.remove(), 2600);
+    }
+    const maskPhone = (s)=> s? (String(s).replace(/\\D/g,'').replace(/^(\\d{3})\\d{4}(\\d{4})$/, '$1****$2')) : '—';
+
+    /* ========== 顶/侧行为（与 doer-dashboard 一致） ========== */
+    document.getElementById('sidebarToggle').addEventListener('click', function(){
+      document.querySelector('.sidebar').classList.toggle('show');
+    });
+    // “查看所有通知”入口统一弹模态
+    document.addEventListener('DOMContentLoaded', function(){
+      function bindOpen(id){
+        var el = document.getElementById(id);
+        if(!el) return;
+        el.addEventListener('click', function(e){
+          e.preventDefault();
+          var mEl = document.getElementById('modalAllNotifications');
+          if(mEl){
+            var m = bootstrap.Modal.getOrCreateInstance(mEl);
+            m.show();
+          }
+        });
+      }
+      bindOpen('viewAllNotifications');
+    });
+
+    /* ========== 本地持久化键（与 pub 端解耦，前缀 doer_） ========== */
+    const KEY_PROFILE = 'doer_acct_profile_v1';
+    const KEY_2FA     = 'doer_acct_2fa_v1';
+    const KEY_SESS    = 'doer_acct_sessions_v1';
+
+    function loadProfile(){
+      const d = JSON.parse(localStorage.getItem(KEY_PROFILE) || 'null') || {
+        username: 'doer_admin',
+        name: '张管理员',
+        dept: '技术部',
+        bio: '接单端系统管理员，负责平台日常维护与风控。',
+        phone: '13800008888',
+        lastLogin: fmtTime(today),
+        twofa: false
+      };
+      return d;
+    }
+    function saveProfile(d){ localStorage.setItem(KEY_PROFILE, JSON.stringify(d)); }
+    function loadSessions(){
+      const def = [
+        {id:'s1', agent:'Windows 11 · Edge 124', ip:'192.168.1.100', loc:'上海', last: fmtTime('2025-09-18T10:01:22'), current:true},
+        {id:'s2', agent:'macOS · Chrome 126', ip:'10.0.0.20', loc:'北京', last: fmtTime('2025-09-17T20:32:11'), current:false},
+        {id:'s3', agent:'iPhone · Safari', ip:'172.16.0.8', loc:'杭州', last: fmtTime('2025-09-16T08:12:45'), current:false}
+      ];
+      return JSON.parse(localStorage.getItem(KEY_SESS) || 'null') || def;
+    }
+    function saveSessions(arr){ localStorage.setItem(KEY_SESS, JSON.stringify(arr)); }
+
+    /* ========== 初始化渲染 ========== */
+    let prof = loadProfile();
+    function refreshHeader(){
+      document.getElementById('lastLogin').textContent = prof.lastLogin || fmtTime(today);
+      document.getElementById('profName').textContent = prof.name || '—';
+      document.getElementById('profPhone').textContent = maskPhone(prof.phone);
+      document.getElementById('prof2FA').innerHTML = prof.twofa ? '<span class="badge badge-on">已开启</span>' : '<span class="badge badge-off">未开启</span>';
+      // 基本信息表单初值
+      document.getElementById('pfUsername').value = prof.username || '';
+      document.getElementById('pfName').value = prof.name || '';
+      document.getElementById('pfDept').value = prof.dept || '技术部';
+      document.getElementById('pfBio').value = prof.bio || '';
+      // 手机表单初值
+      document.getElementById('phCur').value = maskPhone(prof.phone);
+    }
+    refreshHeader();
+
+    // 会话渲染
+    let sessions = loadSessions();
+    function renderSessions(){
+      const tb = document.querySelector('#tblSessions tbody'); tb.innerHTML = '';
+      if(!sessions.length){ document.getElementById('sessEmpty').style.display=''; return; }
+      document.getElementById('sessEmpty').style.display='none';
+      for(const s of sessions){
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${s.agent}</td>
+          <td>${s.ip} / ${s.loc}</td>
+          <td>${s.last}</td>
+          <td>${s.current?'<span class="badge text-bg-success">本设备</span>':'<span class="badge text-bg-secondary">在线</span>'}</td>
+          <td class="text-end">
+            <button class="btn btn-outline-danger btn-sm" ${s.current?'disabled':''} data-act="logout" data-id="${s.id}">注销</button>
+          </td>`;
+        tb.appendChild(tr);
+      }
+      tb.querySelectorAll('button[data-act="logout"]').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          const id = btn.getAttribute('data-id');
+          sessions = sessions.filter(x=> x.id!==id);
+          saveSessions(sessions);
+          renderSessions();
+          toast('已注销该设备', 'secondary');
+        });
+      });
+    }
+    renderSessions();
+    document.getElementById('btnLogoutOthers').addEventListener('click', ()=>{
+      sessions = sessions.filter(x=> x.current);
+      saveSessions(sessions);
+      renderSessions();
+      toast('已注销其它设备', 'secondary');
+    });
+
+    /* ========== 表单交互 ========== */
+    // 基本信息
+    document.getElementById('formProfile').addEventListener('submit', function(e){
+      e.preventDefault();
+      const d = {
+        username: document.getElementById('pfUsername').value,
+        name: document.getElementById('pfName').value.trim(),
+        dept: document.getElementById('pfDept').value,
+        bio: document.getElementById('pfBio').value.trim(),
+        phone: prof.phone,
+        lastLogin: prof.lastLogin,
+        twofa: prof.twofa
+      };
+      if(!d.name){ toast('请填写姓名','danger'); return; }
+      prof = d; saveProfile(prof); refreshHeader(); toast('基本信息已保存');
+    });
+
+    // 密码强度条
+    const pw = document.getElementById('scNew');
+    const pw2 = document.getElementById('scNew2');
+    const pwbar = document.getElementById('pwStrength');
+    function strengthScore(s){
+      let score=0;
+      if(s.length>=8) score++;
+      if(/[A-Z]/.test(s)) score++;
+      if(/[a-z]/.test(s)) score++;
+      if(/\\d/.test(s)) score++;
+      if(/[^A-Za-z0-9]/.test(s)) score++;
+      return Math.min(4, Math.max(1, score-1));
+    }
+    pw.addEventListener('input', ()=>{ pwbar.className = 'strength w'+strengthScore(pw.value); });
+
+    // 安全设置提交
+    document.getElementById('formSecurity').addEventListener('submit', function(e){
+      e.preventDefault();
+      const n1 = pw.value, n2 = pw2.value;
+      if(n1 || n2){
+        if(n1.length<8 || !/[A-Za-z]/.test(n1) || !/\\d/.test(n1)){ toast('新密码需至少8位且包含字母与数字','danger'); return; }
+        if(n1!==n2){ toast('两次输入的新密码不一致','danger'); return; }
+      }
+      const twofa = document.getElementById('sc2FA').checked;
+      prof.twofa = twofa; saveProfile(prof); refreshHeader(); toast('安全设置已更新');
+    });
+
+    // 手机验证码倒计时
+    function countdown(btn, sec){
+      let t=sec; btn.disabled=true;
+      const base = btn.textContent;
+      btn.textContent = `重新发送(${t}s)`;
+      const timer = setInterval(()=>{
+        t--;
+        if(t<=0){ clearInterval(timer); btn.disabled=false; btn.textContent=base; }
+        else btn.textContent = `重新发送(${t}s)`;
+      },1000);
+    }
+
+    document.getElementById('phSend').addEventListener('click', function(){
+      const btn=this; const newPhone = document.getElementById('phNew').value.trim();
+      if(!/^1\\d{10}$/.test(newPhone)){ toast('请输入11位国内手机号','danger'); return; }
+      countdown(btn, 60);
+      toast('验证码已发送至新手机号');
+    });
+
+    document.getElementById('formPhone').addEventListener('submit', function(e){
+      e.preventDefault();
+      const np = document.getElementById('phNew').value.trim();
+      const code = document.getElementById('phCode').value.trim();
+      if(!/^1\\d{10}$/.test(np)){ toast('请输入11位国内手机号','danger'); return; }
+      if(!/^\\d{6}$/.test(code)){ toast('请输入6位验证码','danger'); return; }
+      prof.phone = np; saveProfile(prof); refreshHeader();
+      document.getElementById('phNew').value=''; document.getElementById('phCode').value='';
+      toast('手机号已更新');
+    });
+  </script>
+<script src="p1-unify.js"></script>
+<script src="p2-unify.js"></script>
+</body>
+</html>

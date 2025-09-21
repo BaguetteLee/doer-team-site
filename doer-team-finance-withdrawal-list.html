@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<title>任务接单平台·用户提现列表（fix10）</title>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css"/>
+<style>
+  /* ===== 站点基础配色（与既有页面保持一致） ===== */
+  :root{ --primary:#3b7ddd; --primary-light:#e8f0fe; --white:#fff; --light:#f5f6f8; --border:#e2e8f0; }
+  body{ background:var(--light); color:#2d3748; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+  .navbar{ background:var(--white); border-bottom:1px solid var(--border); box-shadow:0 2px 10px rgba(0,0,0,.05); position:fixed; top:0; left:0; right:0; z-index:1030; padding-left:250px; }
+  .navbar-brand{ color:var(--primary); font-weight:700; }
+  .sidebar{ background:var(--white); height:100vh; position:fixed; left:0; top:0; width:250px; padding-top:60px; border-right:1px solid var(--border); box-shadow:2px 0 10px rgba(0,0,0,.05); overflow-y:auto; z-index:1000; }
+  .sidebar .nav-link{ color:#4a5568; padding:.8rem 1rem; margin:.1rem .5rem; border-radius:6px; display:flex; align-items:center; transition:all .2s; }
+  .sidebar .nav-link i{ margin-right:10px; color:#718096; }
+  .sidebar .nav-link:hover, .sidebar .nav-link.active{ color:var(--primary); background:var(--primary-light); }
+  .nav-section{ margin:.75rem .25rem .25rem; font-size:.8125rem; color:#6c757d; display:flex; align-items:center; gap:.5rem; }
+  .nav-section .dot{ width:10px; height:10px; border-radius:2px; display:inline-block; }
+  .dot--platform{ background:#0d6efd; } .dot--task{ background:#20c997; } .dot--user{ background:#fd7e14; } .dot--settings{ background:#6f42c1; }
+  .main{ margin-left:250px; padding:20px; padding-top:80px; }
+  @media (max-width: 992px){
+    .sidebar{ width:80px; padding-top:70px; }
+    .sidebar .nav-link span{ display:none; }
+    .sidebar .nav-link i{ margin-right:0; font-size:1.2rem; }
+    .navbar{ padding-left:80px; }
+    .main{ margin-left:80px; }
+  }
+  @media (max-width: 768px){
+    .sidebar{ transform: translateX(-100%); width:250px; }
+    .sidebar.show{ transform: translateX(0); }
+    .navbar{ padding-left:15px; }
+    .main{ margin-left:0; }
+    .navbar-toggler{ display:block; }
+  }
+  .navbar-toggler{ display:none; border:none; font-size:1.25rem; }
+  .navbar-toggler:focus{ box-shadow:none; }
+
+  .card{ border:none; border-radius:10px; box-shadow:0 4px 6px rgba(0,0,0,.04); }
+  .card-header{ background:var(--white); border-bottom:1px solid var(--border); font-weight:600; padding:1rem 1.25rem; }
+  .card-body{ padding:1rem 1.25rem; }
+  .btn{ border-radius:6px; font-weight:500; }
+  .table-sm td,.table-sm th{ padding:.45rem .5rem; vertical-align:middle; white-space:nowrap; }
+  .text-mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+
+  /* ===== 右侧抽屉（修复：使用 .open 而非 .show） ===== */
+  #drawer{ right:-740px; position:fixed; top:0; bottom:0; background:#fff; border-left:1px solid var(--border);
+           width:740px; box-shadow:-8px 0 24px rgba(0,0,0,.08); z-index:1060; transition:right .25s; }
+  #drawer.open{ right:0; }
+  #drawerBackdrop{ display:none; }
+  #drawerBackdrop.show{ display:block; }
+
+  /* ===== 列宽控制 ===== */
+  th.col-id{ width:140px; } th.col-user{ width:180px; } th.col-amt{ width:150px; }
+  th.col-chan{ width:120px; } th.col-acct{ width:180px; } th.col-time{ width:170px; }
+  th.col-state{ width:120px; } th.col-op{ width:110px; }
+</style>
+<link rel="stylesheet" href="p1-unify.css"/>
+<link rel="stylesheet" href="p2-unify.css"/>
+</head>
+<body>
+  <!-- ===== 顶部栏 ===== -->
+  <nav class="navbar navbar-expand-lg navbar-light">
+    <div class="container-fluid">
+      <button id="sidebarToggle" class="navbar-toggler" type="button"><span class="navbar-toggler-icon"></span></button>
+      <a class="navbar-brand" href="doer-team-analytics-dashboard.html">
+        <strong><i class="bi bi-lightning-charge me-2"></i>任务接单管理平台</strong>
+      </a>
+      <div class="collapse navbar-collapse">
+        <ul class="navbar-nav ms-auto me-4">
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" id="notifDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false" href="#">
+              <i class="bi bi-bell"></i><span class="badge bg-danger ms-1">3</span>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="#"><i class="bi bi-list-task me-2"></i>有 3 个新任务已上线</a></li>
+              <li><a class="dropdown-item" href="#"><i class="bi bi-clock-history me-2"></i>1 个任务即将截止</a></li>
+              <li><hr class="dropdown-divider"/></li>
+              <li><a class="dropdown-item" href="#" id="viewAllNotifications"><i class="bi bi-list-ul me-2"></i>查看所有通知</a></li>
+            </ul>
+          </li>
+          <li class="nav-item dropdown ms-2">
+            <a class="nav-link dropdown-toggle d-flex align-items-center" data-bs-toggle="dropdown" href="#" role="button">
+              <i class="bi bi-person-circle me-2"></i> 接单管理员
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="doer-team-account-management.html"><i class="bi bi-person-gear me-2"></i>账号与安全</a></li>
+              <li><hr class="dropdown-divider"/></li>
+              <li><a class="dropdown-item" href="#"><i class="bi bi-box-arrow-right me-2"></i>退出</a></li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ===== 侧边栏 ===== -->
+  <aside class="sidebar">
+    <ul class="nav flex-column">
+      <li class="nav-section"><span class="dot dot--platform" style="background:#0d6efd"></span><span>平台</span></li>
+      <li><a class="nav-link" href="doer-team-analytics-dashboard.html"><i class="bi bi-speedometer2 me-2"></i><span>平台总仪表盘</span></a></li>
+      <li><a class="nav-link" href="doer-team-finance-platform-fund-flow.html"><i class="bi bi-cash-coin me-2"></i><span>平台资金流水</span></a></li>
+
+      <li class="nav-section"><span class="dot dot--task" style="background:#20c997"></span><span>任务</span></li>
+      <li><a class="nav-link" href="doer-team-orders-situation.html"><i class="bi bi-cart-check me-2"></i><span>任务接单情况</span></a></li>
+      <li><a class="nav-link" href="doer-team-tasks-completion.html"><i class="bi bi-check2-circle me-2"></i><span>任务完成情况</span></a></li>
+      <li><a class="nav-link" href="doer-team-tasks-list.html"><i class="bi bi-list-task me-2"></i><span>可接任务列表</span></a></li>
+
+      <li class="nav-section"><span class="dot dot--user" style="background:#fd7e14"></span><span>用户</span></li>
+      <li><a class="nav-link" href="doer-team-users-list.html"><i class="bi bi-people me-2"></i><span>平台用户列表</span></a></li>
+      <li><a class="nav-link active" href="doer-team-finance-withdrawal-list.html"><i class="bi bi-bank me-2"></i><span>用户提现列表</span></a></li>
+      <li><a class="nav-link" href="doer-team-finance-user-fund-flow.html"><i class="bi bi-journal-text me-2"></i><span>用户资金流水</span></a></li>
+
+      <li class="nav-section"><span class="dot dot--settings" style="background:#6f42c1"></span><span>设置</span></li>
+      <li><a class="nav-link" href="doer-team-settings-categories.html"><i class="bi bi-sliders me-2"></i><span>业务分类概览</span></a></li>
+      <li><a class="nav-link" href="doer-team-system-api-monitoring.html"><i class="bi bi-activity me-2"></i><span>接口管理监控</span></a></li>
+      <li><a class="nav-link" href="doer-team-finance-payment-account.html"><i class="bi bi-credit-card me-2"></i><span>支付账户设置</span></a></li>
+      <li><a class="nav-link" href="doer-team-account-management.html"><i class="bi bi-person-gear me-2"></i><span>账号管理设置</span></a></li>
+      <li><a class="nav-link" href="doer-team-team-profile.html"><i class="bi bi-building-gear me-2"></i><span>团队资料设置</span></a></li>
+    </ul>
+  </aside>
+
+  <!-- ===== 主体内容 ===== -->
+  <main class="main">
+    <!-- 顶部 KPI -->
+    <section class="row g-3 mb-3">
+      <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body">
+        <div class="small text-muted">今日待审核</div><div class="h4 mb-0" id="kpiPending">--</div>
+        <div class="small text-muted mt-1">待打款 <span id="kpiPayWait">--</span></div>
+      </div></div></div>
+      <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body">
+        <div class="small text-muted">今日已完成</div><div class="h4 mb-0" id="kpiDone">--</div>
+        <div class="small text-muted mt-1">近7日 <span id="kpiDone7d">--</span></div>
+      </div></div></div>
+      <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body">
+        <div class="small text-muted">今日异常</div><div class="h4 mb-0" id="kpiAbn">--</div>
+        <div class="small text-muted mt-1">同名失败 <span id="kpiNameFail">--</span></div>
+      </div></div></div>
+      <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body">
+        <div class="small text-muted">今日提现总额（元）</div><div class="h4 mb-0" id="kpiAmt">--</div>
+        <div class="small text-muted mt-1">累计 <span id="kpiAmtTotal">--</span></div>
+      </div></div></div>
+    </section>
+
+    <!-- 筛选区 -->
+    <section class="card mb-3"><div class="card-body py-2">
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <input id="kw" class="form-control form-control-sm" style="width:240px" placeholder="提现ID / 用户ID / 用户名"/>
+        <select id="state" class="form-select form-select-sm" style="width:160px">
+          <option value="">状态（全部）</option><option>待审核</option><option>待打款</option><option>已完成</option><option>已驳回</option>
+        </select>
+        <select id="acctType" class="form-select form-select-sm" style="width:160px">
+          <option value="">账户类型（全部）</option><option>支付宝</option><option>微信</option><option>银行卡</option>
+        </select>
+        <input id="dateFrom" class="form-control form-control-sm" style="width:140px" type="date"/><span class="text-muted">—</span>
+        <input id="dateTo" class="form-control form-control-sm" style="width:140px" type="date"/>
+        <input id="amtMin" class="form-control form-control-sm" style="width:120px" type="number" placeholder="金额 ≥"/>
+        <input id="amtMax" class="form-control form-control-sm" style="width:120px" type="number" placeholder="金额 ≤"/>
+        <button id="btnQuery" class="btn btn-primary btn-sm"><i class="bi bi-funnel me-1"></i>筛选</button>
+        <button id="btnReset" class="btn btn-outline-secondary btn-sm">重置</button>
+        <button id="btnExport" class="btn btn-outline-primary btn-sm"><i class="bi bi-download me-1"></i>导出 CSV</button>
+      </div>
+    </div></section>
+
+    <!-- 列表 -->
+    <section class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <div>用户提现列表（<span id="totalCount">0</span>）</div>
+        <div class="small text-muted">每页 15 条</div>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover table-sm align-middle mb-0">
+            <thead class="table-light"><tr>
+              <th class="col-id">提现ID</th><th class="col-user">用户</th><th class="col-amt text-end">申请金额</th>
+              <th class="col-chan">账户类型</th><th class="col-acct">收款账号</th><th class="col-time">申请时间</th>
+              <th class="col-state">状态</th><th class="col-state">风险</th><th class="col-op">操作</th>
+            </tr></thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card-footer d-flex justify-content-between align-items-center">
+        <div class="text-muted small">仅查看；所有处理流程均在总部端。</div>
+        <nav><ul class="pagination pagination-sm mb-0" id="pager"></ul></nav>
+      </div>
+    </section>
+  </main>
+
+  <!-- 详情抽屉（修复：去重 Tab 结构；按钮切换 .open 类） -->
+  <aside id="drawer">
+    <div class="d-flex align-items-center justify-content-between border-bottom p-2">
+      <div class="d-flex align-items-center gap-2"><h6 class="mb-0">提现详情（接单视角） · <span id="dvId" class="text-mono"></span></h6><span id="dvState" class="badge bg-secondary">—</span></div>
+      <button id="btnCloseDrawer" class="btn btn-sm btn-outline-secondary"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="p-3" style="overflow:auto; height: calc(100% - 48px);">
+      <div class="kv mb-3" style="display:grid; grid-template-columns:156px 1fr; gap:.5rem 1rem; align-items:center;">
+        <div class="text-muted">用户</div><div id="dvUser">—</div>
+        <div class="text-muted">账户类型</div><div id="dvAcctType">—</div>
+        <div class="text-muted">收款实名</div><div id="dvRealName">—</div>
+        <div class="text-muted">收款账号</div><div id="dvAcctNo">—</div>
+        <div class="text-muted">申请金额</div><div id="dvAmount">—</div>
+        <div class="text-muted">申请时间</div><div id="dvTime">—</div>
+        <div class="text-muted">备注</div><div id="dvRemark">—</div>
+      </div>
+      <ul class="nav nav-tabs">
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-balance">余额情况</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-audit">审核记录</button></li>
+      </ul>
+      <div class="tab-content mt-3">
+        <div class="tab-pane fade show active" id="tab-balance">
+          <div class="row g-2">
+            <div class="col-md-6"><div class="card h-100"><div class="card-body">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <div class="small text-muted">余额快照（元）</div><span class="text-muted" style="font-size:12px;">仅供参考</span>
+              </div>
+              <div class="row g-3">
+                <div class="col-6"><div class="text-muted small">可用</div><div class="h6" id="balAvail">—</div></div>
+                <div class="col-6"><div class="text-muted small">冻结</div><div class="h6" id="balFrozen">—</div></div>
+                <div class="col-6"><div class="text-muted small">待结算</div><div class="h6" id="balPending">—</div></div>
+                <div class="col-6"><div class="text-muted small">上次提现</div><div class="h6" id="balLast">—</div></div>
+              </div>
+              <hr class="my-2"/>
+              <div class="small">本次申请：<span class="fw-semibold" id="balApply">—</span>；预计打款后可用：<span class="fw-semibold" id="balAfter">—</span></div>
+              <div class="alert alert-warning mt-2 py-2 px-3 d-none" id="balWarn"><i class="bi bi-exclamation-triangle me-1"></i> 申请金额超过可用余额，请复核。</div>
+            </div></div></div>
+            <div class="col-md-6"><div class="card h-100"><div class="card-body">
+              <div class="small text-muted mb-2">最近 10 条资金流水</div>
+              <div class="table-responsive"><table class="table table-sm align-middle">
+                <thead><tr><th style="width:160px;">时间</th><th style="width:120px;">类型</th><th class="text-end" style="width:120px;">金额</th><th>余额</th><th>备注</th></tr></thead>
+                <tbody id="fundTbody"></tbody>
+              </table></div>
+            </div></div></div>
+          </div>
+        </div>
+        <div class="tab-pane fade" id="tab-audit">
+          <div class="table-responsive"><table class="table table-sm align-middle">
+            <thead><tr><th style="width:160px;">时间</th><th style="width:120px;">动作</th><th>备注</th><th style="width:120px;">操作人</th></tr></thead>
+            <tbody id="auditTbody"></tbody>
+          </table></div>
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div id="drawerBackdrop" class="position-fixed top-0 start-0 w-100 h-100" style="background: rgba(0,0,0,.2); z-index:1050;"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // 顶部：移动端侧边栏开关
+    document.getElementById('sidebarToggle')?.addEventListener('click', function(){
+      document.querySelector('.sidebar')?.classList.toggle('show');
+    });
+  </script>
+
+  <script>
+  /* ====================================================
+   * 接单平台 · 用户提现列表（fix10）
+   * 变更点（关键修复均加中文注释）：
+   * 1) 新增模拟数据 window.WITHS，避免空数组导致“无数据”。
+   * 2) 修正筛选器 ID：使用 #state / #acctType，而非不存在的 #stateSel/#chanSel。
+   * 3) 修正抽屉开关类名：CSS 使用 .open，这里不再用 .show。
+   * 4) 修复抽屉 Tab 重复/嵌套错误的 DOM 结构。
+   * 5) 统一分页为 15 条，与页脚提示一致。
+   * 6) 日期筛选按“YYYY-MM-DD”与记录日期前 10 位比较，避免字符串比较失真。
+   * 7) 列表与详情中的收款账号统一脱敏显示。
+   * 8) KPI 全量计算并显示。
+   * ==================================================== */
+
+  ;(function(){
+    /* ---------- 模拟数据：仅前端演示 ---------- */
+    // 说明：仅包含“任务佣金/提现”两类资金变动；账号全部脱敏展示
+    window.WITHS = (function(){
+      const users = [
+        {uid:'U102938', name:'李*军', acctType:'支付宝', acctNo:'li**jun@example.com'},
+        {uid:'U283746', name:'王*宁', acctType:'微信',   acctNo:'wxid_**89ab12'},
+        {uid:'U556677', name:'周*琪', acctType:'银行卡', acctNo:'6222********1234'},
+        {uid:'U889900', name:'张*磊', acctType:'支付宝', acctNo:'zh**lei@pay.cn'},
+        {uid:'U111222', name:'陈*婷', acctType:'微信',   acctNo:'wxid_**77cd45'},
+        {uid:'U333444', name:'黄*敏', acctType:'银行卡', acctNo:'6216********8899'}
+      ];
+      const states = ['待审核','待打款','已完成','已驳回'];
+      const list = [];
+      let idSeed = 1;
+      for(let d=9; d<=17; d++){         // 9~17 号
+        for(let k=0; k<4; k++){         // 每天 4 笔
+          const u = users[(d+k)%users.length];
+          const amount = (80 + (d*7 + k)*3) % 260 + 40;   // 40~299 随机
+          const st = states[(d+k) % states.length];
+          list.push({
+            id: 'W202509' + String(d).padStart(2,'0') + '-' + String(idSeed++).padStart(4,'0'),
+            uid: u.uid,
+            user: u.name,
+            acctType: u.acctType,
+            acctNo: u.acctNo,
+            amount: Number(amount.toFixed(2)),
+            time: `2025-09-${String(d).padStart(2,'0')} ${String(10+k).padStart(2,'0')}:${String(12+k*3).padStart(2,'0')}`,
+            state: st,
+            risk: (k===3 ? {level:'警告', flags:['频次较高']} : {level:'正常', flags:[]})
+          });
+        }
+      }
+      return list;
+    })();
+
+    /* ---------- 状态 ---------- */
+    const state = {
+      page: 1,
+      pageSize: 15,    // 修复：与页脚一致
+      filtered: window.WITHS.slice(),
+      filters: { kw:'', chan:'', st:'', dateFrom:'', dateTo:'', amtMin:'', amtMax:'' }
+    };
+
+    /* ---------- 工具 ---------- */
+    // 脱敏：尽量保留前后 2 位
+    function mask(str){
+      if(!str) return '—';
+      const s = String(str);
+      if(s.includes('@')){ // 邮箱
+        const [a,b] = s.split('@');
+        return (a.slice(0,2) + '**' + (a.slice(-2) || '') + '@' + b);
+      }
+      // 其他：保留前2后2
+      if(s.length <= 4) return s[0] + '**' + s.slice(-1);
+      return s.slice(0,2) + '****' + s.slice(-2);
+    }
+    // 读 DOM 值
+    function val(id){ const el=document.getElementById(id); return el? el.value : ''; }
+
+    /* ---------- KPI 计算（演示口径） ---------- */
+    function computeKPI(list){
+      const today = '2025-09-17'; // 演示用“今日”
+      const k = {pending:0, paywait:0, done:0, done7d:0, abn:0, nameFail:0, amt:0, amtTotal:0};
+      list.forEach(x=>{
+        if(x.time.slice(0,10)===today){
+          if(x.state==='待审核') k.pending++;
+          if(x.state==='待打款') k.paywait++;
+          if(x.state==='已完成') k.done++;
+          k.amt += x.amount;
+          if(x.risk && x.risk.level && x.risk.level!=='正常') k.abn++;
+          if(x.risk && Array.isArray(x.risk.flags) && x.risk.flags.includes('姓名不一致')) k.nameFail++;
+        }
+        // 近 7 日/累计：演示口径简单处理
+        k.amtTotal += x.amount;
+        if(x.state==='已完成') k.done7d++;
+      });
+      const setText = (id, txt)=>{ const el=document.getElementById(id); if(el) el.textContent = txt; };
+      setText('kpiPending', k.pending);
+      setText('kpiPayWait', k.paywait);
+      setText('kpiDone', k.done);
+      setText('kpiDone7d', k.done7d);
+      setText('kpiAbn', k.abn);
+      setText('kpiNameFail', k.nameFail);
+      setText('kpiAmt', k.amt.toFixed(2));
+      setText('kpiAmtTotal', k.amtTotal.toFixed(2));
+    }
+
+    /* ---------- 过滤 ---------- */
+    function inRange(val, min, max){
+      if(min!=='' && !isNaN(min) && Number(val) < Number(min)) return false;
+      if(max!=='' && !isNaN(max) && Number(val) > Number(max)) return false;
+      return true;
+    }
+    function applyFilters(){
+      const f = state.filters;
+      const kw = (f.kw||'').trim();
+      const chan = f.chan||''; const st = f.st||'';
+      const df = f.dateFrom||''; const dt = f.dateTo||'';
+      const aMin = f.amtMin!==''? Number(f.amtMin) : '';
+      const aMax = f.amtMax!==''? Number(f.amtMax) : '';
+
+      state.filtered = window.WITHS.filter(function(r){
+        if(kw){
+          const s = (r.id+' '+r.user+' '+r.uid+' '+r.acctNo).toLowerCase();
+          if(s.indexOf(kw.toLowerCase()) === -1) return false;
+        }
+        if(chan && r.acctType !== chan) return false;
+        if(st && r.state !== st) return false;
+        // 修复：仅比较日期部分
+        const day = r.time.slice(0,10);
+        if(df && day < df) return false;
+        if(dt && day > dt) return false;
+        if(!inRange(r.amount, aMin, aMax)) return false;
+        return true;
+      });
+      state.page = 1;
+
+      // KPI 更新（基于过滤后列表以便演示）
+      computeKPI(state.filtered);
+      // 计数
+      const totalEl = document.getElementById('totalCount'); if(totalEl) totalEl.textContent = state.filtered.length;
+      renderPage(state.page);
+    }
+
+    /* ---------- 渲染（分页+事件委托） ---------- */
+    function renderPage(p){
+      const total = state.filtered.length;
+      const pageTotal = Math.max(1, Math.ceil(total/state.pageSize));
+      if(p<1) p=1; if(p>pageTotal) p = pageTotal;
+      state.page = p;
+
+      const start = (p-1)*state.pageSize;
+      const rows = state.filtered.slice(start, start+state.pageSize);
+
+      const tbody = document.getElementById('tbody');
+      if(tbody) tbody.innerHTML = '';
+      rows.forEach(function(r){
+        const tr = document.createElement('tr');
+        tr.innerHTML = [
+          `<td class="text-mono">${r.id}</td>`,
+          `<td>${r.user}（${r.uid}）</td>`,
+          `<td class="text-end">¥ ${r.amount.toFixed(2)}</td>`,
+          `<td>${r.acctType}</td>`,
+          `<td>${mask(r.acctNo)}</td>`,   // 脱敏展示
+          `<td>${r.time}</td>`,
+          `<td>`+(r.state? `<span class="badge ${r.state==='已完成'?'bg-success': r.state==='待打款'?'bg-primary': r.state==='已驳回'?'bg-danger':'bg-secondary'}">${r.state}</span>`: '')+`</td>`,
+          `<td>${(r.risk&&r.risk.level) || '正常'}</td>`,
+          `<td><button class="btn btn-sm btn-outline-primary" data-id="${r.id}">查看</button></td>`
+        ].join('');
+        tbody.appendChild(tr);
+      });
+
+      // 查看按钮（事件委托）
+      if(tbody){
+        tbody.onclick = function(e){
+          const t = e.target;
+          if(t && t.matches('button[data-id]')){
+            openDrawer(t.getAttribute('data-id'));
+          }
+        };
+      }
+
+      // 分页
+      const pager = document.getElementById('pager');
+      if(pager){
+        pager.innerHTML = '';
+        for(let i=1;i<=pageTotal;i++){
+          const li = document.createElement('li');
+          li.className = 'page-item'+(i===state.page?' active':'');
+          li.innerHTML = `<a class="page-link" href="javascript:;" data-page="${i}">${i}</a>`;
+          pager.appendChild(li);
+        }
+        pager.onclick = function(e){
+          const a = e.target.closest('a[data-page]');
+          if(a){ renderPage(Number(a.getAttribute('data-page'))); }
+        };
+      }
+    }
+
+    /* ---------- 详情抽屉 ---------- */
+    window.openDrawer = function(id){
+      const r = window.WITHS.find(x=>x.id===id);
+      if(!r) return;
+
+      // 基础字段
+      const set = (id, txt)=>{ const el=document.getElementById(id); if(el) el.textContent = txt; };
+      set('dvId', r.id);
+      const stEl = document.getElementById('dvState');
+      if(stEl){
+        stEl.textContent = r.state||'待审核';
+        stEl.className = 'badge ' + (r.state==='已完成'?'bg-success': r.state==='待打款'?'bg-primary': r.state==='已驳回'?'bg-danger':'bg-secondary');
+      }
+      set('dvUser', `${r.user}（${r.uid}）`);
+      set('dvAcctType', r.acctType);
+      set('dvRealName', r.user);
+      set('dvAcctNo', mask(r.acctNo)); // 脱敏展示
+      set('dvAmount', '¥ ' + r.amount.toFixed(2));
+      set('dvTime', r.time);
+      set('dvRemark', '模拟：接单平台仅查看');
+
+      // 余额情况（模拟）
+      const avl = (500 + Math.random()*5000),
+            frz = (Math.random()*800),
+            pend = (Math.random()*900);
+      set('balAvail',  '¥ ' + avl.toFixed(2));
+      set('balFrozen', '¥ ' + frz.toFixed(2));
+      set('balPending','¥ ' + pend.toFixed(2));
+      set('balLast',   `2025-09-${String(10+Math.floor(Math.random()*8)).padStart(2,'0')} 14:${String(30+Math.floor(Math.random()*20)).padStart(2,'0')}`);
+      set('balApply',  '¥ ' + r.amount.toFixed(2));
+      set('balAfter',  '¥ ' + (avl - r.amount).toFixed(2));
+      const warn = document.getElementById('balWarn'); if(warn) warn.classList.toggle('d-none', (avl - r.amount) >= 0);
+
+      // 审核记录（模拟）
+      const auditBody = document.getElementById('auditTbody'); if(auditBody) auditBody.innerHTML='';
+      [['提交','用户'],['初审','总部'],['复核','总部']].forEach(function(step, idx){
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>2025-09-${String(10+idx).padStart(2,'0')} 10:${20+idx}</td><td>${step[0]}</td><td>模拟</td><td>${step[1]}</td>`;
+        auditBody.appendChild(tr);
+      });
+      if(r.state==='已驳回'){
+        const reasons = ['同名校验不通过','账户风险命中规则','频次过高触发风控','信息不一致需线下复核'];
+        const reason  = reasons[Math.floor(Math.random()*reasons.length)];
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>2025-09-18 11:45</td><td>驳回</td><td class="text-danger">原因：${reason}</td><td>总部</td>`;
+        auditBody.appendChild(tr);
+      }else if(r.state==='已完成' || r.state==='待打款'){
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>2025-09-18 11:45</td><td>打款</td><td>模拟</td><td>总部</td>`;
+        auditBody.appendChild(tr);
+      }
+
+      // 资金流水（仅 任务佣金 / 提现）
+      const fundBody = document.getElementById('fundTbody'); if(fundBody) fundBody.innerHTML='';
+      for(let i=0;i<Math.min(10, 3+Math.floor(Math.random()*7)); i++){
+        const isIncome = Math.random() < 0.5;
+        const amt = (isIncome?1:-1) * (50 + Math.random()*200);
+        const type = isIncome ? '任务佣金' : '提现';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>2025-09-${String(8+i).padStart(2,'0')} 11:${10+i}</td>` +
+                       `<td>${type}</td>` +
+                       `<td class="text-end">¥ ${Math.abs(amt).toFixed(2)}</td>` +
+                       `<td>¥ ${(1000 + i*5).toFixed(2)}</td>` +
+                       `<td>模拟</td>`;
+        fundBody.appendChild(tr);
+      }
+
+      // 打开抽屉（修复：使用 .open）
+      document.getElementById('drawer').classList.add('open');
+      document.getElementById('drawerBackdrop').classList.add('show');
+    };
+
+    // 关闭抽屉
+    document.getElementById('btnCloseDrawer')?.addEventListener('click', function(){
+      document.getElementById('drawer').classList.remove('open');
+      document.getElementById('drawerBackdrop').classList.remove('show');
+    });
+    document.getElementById('drawerBackdrop')?.addEventListener('click', function(){
+      document.getElementById('btnCloseDrawer')?.click();
+    });
+
+    /* ---------- 绑定筛选/重置/导出（修复：使用正确的控件 ID） ---------- */
+    document.getElementById('btnQuery')?.addEventListener('click', function(){
+      state.filters.kw = val('kw');
+      state.filters.chan = val('acctType');   // 修复：acctType
+      state.filters.st = val('state');        // 修复：state
+      state.filters.dateFrom = val('dateFrom');
+      state.filters.dateTo = val('dateTo');
+      state.filters.amtMin = val('amtMin');
+      state.filters.amtMax = val('amtMax');
+      applyFilters();
+    });
+    document.getElementById('btnReset')?.addEventListener('click', function(){
+      ['kw','acctType','state','dateFrom','dateTo','amtMin','amtMax'].forEach(function(id){
+        const el=document.getElementById(id); if(el) el.value='';
+      });
+      state.filters = { kw:'', chan:'', st:'', dateFrom:'', dateTo:'', amtMin:'', amtMax:'' };
+      applyFilters();
+    });
+    document.getElementById('btnExport')?.addEventListener('click', function(){
+      const cols = ['提现ID','用户','金额','账户类型','收款账号','申请时间','状态','风险'];
+      const lines = [cols.join(',')];
+      state.filtered.forEach(function(r){
+        lines.push([r.id, `${r.user}（${r.uid}）`, '¥ '+r.amount.toFixed(2), r.acctType, mask(r.acctNo), r.time, r.state, (r.risk&&r.risk.level)||'正常'].join(','));
+      });
+      const csv = lines.join('\n');
+      const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = '用户提现列表_接单平台.csv';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
+
+    // 首次渲染
+    applyFilters();
+  })();
+  </script>
+<script src="p1-unify.js"></script>
+<script src="p2-unify.js"></script>
+</body>
+</html>

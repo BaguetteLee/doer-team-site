@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>任务接单平台·任务接单情况（接单视角精简版）</title>
+  <!-- 依赖 -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root{ --primary:#3b7ddd; --primary-light:#e8f0fe; --white:#fff; --light:#f5f6f8; --border:#e2e8f0; }
+    body{ background:var(--light); color:#2d3748; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    .navbar{ background:var(--white); border-bottom:1px solid var(--border); box-shadow:0 2px 10px rgba(0,0,0,.05); position:fixed; top:0; left:0; right:0; z-index:1030; padding-left:250px; }
+    .navbar-brand{ color:var(--primary); font-weight:700; }
+    .sidebar{ background:var(--white); height:100vh; position:fixed; left:0; top:0; width:250px; padding-top:60px; border-right:1px solid var(--border); box-shadow:2px 0 10px rgba(0,0,0,.05); overflow-y:auto; z-index:1000; }
+    .sidebar .nav-link{ color:#4a5568; padding:.8rem 1rem; margin:.1rem .5rem; border-radius:6px; display:flex; align-items:center; transition:all .2s; }
+    .sidebar .nav-link i{ margin-right:10px; color:#718096; }
+    .sidebar .nav-link:hover, .sidebar .nav-link.active{ color:var(--primary); background:var(--primary-light); }
+    .nav-section{ margin:.75rem .25rem .25rem; font-size:.8125rem; color:#6c757d; display:flex; align-items:center; gap:.5rem; }
+    .nav-section .dot{ width:10px; height:10px; border-radius:2px; display:inline-block; }
+    .dot--platform{ background:#0d6efd; } .dot--task{ background:#20c997; } .dot--user{ background:#fd7e14; } .dot--settings{ background:#6f42c1; }
+    .main{ margin-left:250px; padding:20px; padding-top:80px; }
+    @media (max-width: 992px){
+      .sidebar{ width:80px; padding-top:70px; }
+      .sidebar .nav-link span{ display:none; }
+      .sidebar .nav-link i{ margin-right:0; font-size:1.2rem; }
+      .navbar{ padding-left:80px; }
+      .main{ margin-left:80px; }
+    }
+    @media (max-width: 768px){
+      .sidebar{ transform: translateX(-100%); width:250px; }
+      .sidebar.show{ transform: translateX(0); }
+      .navbar{ padding-left:15px; }
+      .main{ margin-left:0; }
+      .navbar-toggler{ display:block; }
+    }
+    .navbar-toggler{ display:none; border:none; font-size:1.25rem; }
+    .navbar-toggler:focus{ box-shadow:none; }
+    .dashboard-card{ background:var(--white); border:none; border-radius:10px; box-shadow:0 4px 6px rgba(0,0,0,.04); }
+    .card-header{ background:var(--white); border-bottom:1px solid var(--border); font-weight:600; padding:1rem 1.25rem; }
+    .card-body{ padding:1rem 1.25rem; }
+    .table-sm td,.table-sm th{ padding:.4rem .5rem; vertical-align:middle; }
+    .text-mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    .metric-sub{ font-size:.85rem; color:#6c757d; }
+    .metric-value{ font-size:1.6rem; font-weight:700; }
+    .progress{ height:8px; }
+    .btn{ border-radius:6px; font-weight:500; }
+    .truncate{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .cell-tight{ font-size:13px; line-height:1.2; }
+    /* 抽屉默认关闭（不要使用 end-0 以免 !important 强制展开） */
+    #drawer{ right:-880px; }
+    #drawer.open{ right:0; }
+    #drawerBackdrop{ display:none; }
+    #drawerBackdrop.show{ display:block; }
+  </style>
+<link rel="stylesheet" href="p1-unify.css"/>
+<link rel="stylesheet" href="p2-unify.css"/>
+</head>
+<body>
+  <!-- 顶部 -->
+  <nav class="navbar navbar-expand-lg navbar-light">
+    <div class="container-fluid">
+      <button id="sidebarToggle" class="navbar-toggler" type="button"><span class="navbar-toggler-icon"></span></button>
+      <a class="navbar-brand" href="doer-team-analytics-dashboard.html">
+        <strong><i class="bi bi-lightning-charge me-2"></i>任务接单管理平台</strong>
+      </a>
+      <div class="collapse navbar-collapse">
+        <ul class="navbar-nav ms-auto me-4">
+          <li class="nav-item dropdown ms-2">
+            <a class="nav-link dropdown-toggle d-flex align-items-center" data-bs-toggle="dropdown" href="#" role="button">
+              <i class="bi bi-person-circle me-2"></i> 接单管理员
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="doer-team-account-management.html"><i class="bi bi-person-gear me-2"></i>账号与安全</a></li>
+              <li><hr class="dropdown-divider"/></li>
+              <li><a class="dropdown-item" href="#"><i class="bi bi-box-arrow-right me-2"></i>退出</a></li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 侧边栏 -->
+  <aside class="sidebar">
+    <ul class="nav flex-column">
+      <li class="nav-section"><span class="dot dot--platform"></span><span>平台</span></li>
+      <li><a class="nav-link" href="doer-team-analytics-dashboard.html"><i class="bi bi-speedometer2 me-2"></i><span>平台总仪表盘</span></a></li>
+      <li><a class="nav-link" href="doer-team-finance-platform-fund-flow.html"><i class="bi bi-cash-coin me-2"></i><span>平台资金流水</span></a></li>
+      <li class="nav-section"><span class="dot dot--task"></span><span>任务</span></li>
+      <li><a class="nav-link active" href="doer-team-orders-situation.html"><i class="bi bi-cart-check me-2"></i><span>任务接单情况</span></a></li>
+      <li><a class="nav-link" href="doer-team-tasks-completion.html"><i class="bi bi-check2-circle me-2"></i><span>任务完成情况</span></a></li>
+      <li><a class="nav-link" href="doer-team-tasks-list.html"><i class="bi bi-list-task me-2"></i><span>可接任务列表</span></a></li>
+      <li class="nav-section"><span class="dot dot--user"></span><span>用户</span></li>
+      <li><a class="nav-link" href="doer-team-users-list.html"><i class="bi bi-people me-2"></i><span>平台用户列表</span></a></li>
+      <li><a class="nav-link" href="doer-team-finance-withdrawal-list.html"><i class="bi bi-bank me-2"></i><span>用户提现列表</span></a></li>
+      <li><a class="nav-link" href="doer-team-finance-user-fund-flow.html"><i class="bi bi-journal-text me-2"></i><span>用户资金流水</span></a></li>
+      <li class="nav-section"><span class="dot dot--settings"></span><span>设置</span></li>
+      <li><a class="nav-link" href="doer-team-settings-categories.html"><i class="bi bi-sliders me-2"></i><span>业务分类概览</span></a></li>
+      <li><a class="nav-link" href="doer-team-system-api-monitoring.html"><i class="bi bi-activity me-2"></i><span>接口管理监控</span></a></li>
+      <li><a class="nav-link" href="doer-team-finance-payment-account.html"><i class="bi bi-credit-card me-2"></i><span>支付账户设置</span></a></li>
+      <li><a class="nav-link" href="doer-team-account-management.html"><i class="bi bi-person-gear me-2"></i><span>账号管理设置</span></a></li>
+      <li><a class="nav-link" href="doer-team-team-profile.html"><i class="bi bi-building-gear me-2"></i><span>团队资料设置</span></a></li>
+    </ul>
+  </aside>
+
+  <!-- 主内容 -->
+  <main class="main">
+    <!-- 时间范围 -->
+    <div class="row g-2 align-items-center mb-3">
+      <div class="col-auto">
+        <div id="topRange" class="btn-group btn-group-sm">
+          <button class="btn btn-outline-primary" data-range="d1" type="button">今日</button>
+          <button class="btn btn-outline-primary" data-range="d7" type="button">近7日</button>
+          <button class="btn btn-outline-primary active" data-range="d30" type="button">近30日</button>
+          <button class="btn btn-outline-primary" data-range="y1" type="button">近一年</button>
+          <button class="btn btn-outline-secondary" data-range="total" type="button">累计</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPI（只保留接单与完成相关） -->
+    <div class="row g-3 mb-2">
+      <div class="col-xxl-2 col-md-4 col-sm-6"><div class="dashboard-card card h-100"><div class="card-body">
+        <div class="metric-sub">进行中任务</div><div id="kpiRunning" class="metric-value">0</div>
+      </div></div></div>
+      <div class="col-xxl-2 col-md-4 col-sm-6"><div class="dashboard-card card h-100"><div class="card-body">
+        <div class="metric-sub">活跃接单用户</div><div id="kpiActiveDoers" class="metric-value">0</div>
+      </div></div></div>
+      <div class="col-xxl-2 col-md-4 col-sm-6"><div class="dashboard-card card h-100"><div class="card-body">
+        <div class="metric-sub">总接单份数</div><div id="kpiClaims" class="metric-value">0</div>
+      </div></div></div>
+      <div class="col-xxl-2 col-md-4 col-sm-6"><div class="dashboard-card card h-100"><div class="card-body">
+        <div class="metric-sub">总提交数</div><div id="kpiSubmits" class="metric-value">0</div>
+      </div></div></div>
+      <div class="col-xxl-2 col-md-4 col-sm-6"><div class="dashboard-card card h-100"><div class="card-body">
+        <div class="metric-sub">总完成数</div><div id="kpiApproved" class="metric-value">0</div>
+      </div></div></div>
+      <div class="col-xxl-2 col-md-4 col-sm-6"><div class="dashboard-card card h-100"><div class="card-body">
+        <div class="metric-sub">平均通过率</div><div id="kpiApproveRate" class="metric-value">0%</div>
+      </div></div></div>
+    </div>
+
+    <!-- 趋势 + 分类占比 -->
+    <div class="row g-3 mb-3">
+      <div class="col-lg-8">
+        <div class="dashboard-card card h-100">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span>接单/提交/完成趋势</span>
+            <div id="trendGroup" class="btn-group btn-group-sm">
+              <button class="btn btn-outline-secondary active" data-gran="day">按日</button>
+              <button class="btn btn-outline-secondary" data-gran="week">按周</button>
+              <button class="btn btn-outline-secondary" data-gran="month">按月</button>
+            </div>
+          </div>
+          <div class="card-body"><canvas id="trendChart" height="120"></canvas></div>
+        </div>
+      </div>
+      <div class="col-lg-4">
+        <div class="dashboard-card card h-100">
+          <div class="card-header">任务分类占比（按接单人数）</div>
+          <div class="card-body">
+            <canvas id="pieChart" height="180"></canvas>
+            <div class="small text-muted mt-2">按各分类聚合接单人数计算。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 筛选 -->
+    <div class="card p-3 mb-3 dashboard-card">
+      <form id="filterForm" class="row g-3 align-items-end">
+        <div class="col-md-4">
+          <label class="form-label small text-muted">关键词</label>
+          <input id="fKw" type="text" class="form-control form-control-sm" placeholder="任务ID / 任务分类"/>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small text-muted">任务分类</label>
+          <select id="fCat" class="form-select form-select-sm"><option value="">全部</option></select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small text-muted">创建时间（起）</label>
+          <input id="fStart" type="date" class="form-control form-control-sm"/>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small text-muted">创建时间（止）</label>
+          <input id="fEnd" type="date" class="form-control form-control-sm"/>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small text-muted">排序</label>
+          <select id="fSort" class="form-select form-select-sm">
+            <option value="recent">最近创建</option>
+            <option value="doers">接单人数</option>
+            <option value="claims">接单份数</option>
+            <option value="submits">提交数</option>
+            <option value="approved">完成数</option>
+            <option value="approveRate">通过率</option>
+          </select>
+        </div>
+        <div class="col-12 d-flex gap-2">
+          <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-funnel"></i> 应用筛选</button>
+          <button id="btnReset" type="button" class="btn btn-outline-secondary btn-sm">重置</button>
+          <button id="btnExport" type="button" class="btn btn-outline-primary btn-sm"><i class="bi bi-download"></i> 导出 CSV</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- 表格（去掉标题/平台/发布用户/额度/审核等列） -->
+    <div class="dashboard-card card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <div>任务列表（<span id="totalCount">0</span>）</div>
+        <div class="small text-muted">每页 12 条</div>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover table-sm align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th style="width:160px;">任务ID</th>
+                <th style="width:220px;">任务分类</th>
+                <th style="width:140px;">接单人数</th>
+                <th style="width:140px;">已接份数</th>
+                <th style="width:180px;">提交 / 完成</th>
+                <th style="width:120px;">完成率</th>
+                <th style="width:90px;">截止</th>
+                <th style="width:180px;">操作</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyTasks"></tbody>
+          </table>
+        </div>
+        <div class="d-flex justify-content-between align-items-center p-2">
+          <div class="small text-muted">当前第 <span id="pageNo">1</span> / <span id="pageTotal">1</span> 页</div>
+          <nav><ul id="pager" class="pagination pagination-sm mb-0"></ul></nav>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- 任务详情抽屉（仅概览与接单用户） -->
+  <aside id="drawer" class="position-fixed top-0 bottom-0 bg-white border-start" style="width: 860px; right:-880px; box-shadow:-8px 0 24px rgba(0,0,0,.08); z-index:1060; transition:right .25s;">
+    <div class="d-flex align-items-center justify-content-between border-bottom p-2">
+      <div class="d-flex align-items-center gap-2">
+        <h6 class="mb-0">任务概览（接单视角）</h6>
+      </div>
+      <button id="btnCloseDrawer" class="btn btn-sm btn-outline-secondary"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="p-3" style="overflow:auto; height: calc(100% - 48px);">
+      <div class="row g-3 mb-2">
+        <div class="col-md-6"><div class="small text-muted">任务ID</div><div class="fw-semibold" id="dId">—</div></div>
+        <div class="col-md-6"><div class="small text-muted">任务分类</div><div class="fw-semibold" id="dCat">—</div></div>
+        <div class="col-md-6"><div class="small text-muted">创建时间</div><div class="fw-semibold" id="dTime">—</div></div>
+        <div class="col-md-6"><div class="small text-muted">赏金（单份）</div><div class="fw-semibold" id="dBounty">—</div></div>
+      </div>
+      <ul class="nav nav-tabs" role="tablist">
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-overview">概览</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-doers">接单用户</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-audit">审核情况</button></li>
+      </ul>
+      <div class="tab-content mt-3">
+        <div class="tab-pane fade show active" id="tab-overview">
+          <div class="row g-3">
+            <div class="col-md-3">
+              <div class="small text-muted">接单人数</div>
+              <div class="fw-semibold" id="dDoerCount">—</div>
+            </div>
+            <div class="col-md-3">
+              <div class="small text-muted">已接份数</div>
+              <div class="fw-semibold" id="dClaimed">—</div>
+            </div>
+            <div class="col-md-3">
+              <div class="small text-muted">提交数</div>
+              <div class="fw-semibold" id="dSubmits">—</div>
+            </div>
+            <div class="col-md-3">
+              <div class="small text-muted">完成数</div>
+              <div class="fw-semibold" id="dApproved">—</div>
+            </div>
+            <div class="col-md-12">
+              <div class="small text-muted">完成率</div>
+              <div class="progress mt-1"><div id="dProgressBar" class="progress-bar" style="width:0%"></div></div>
+              <div class="small mt-1" id="dRateText">—</div>
+            </div>
+          </div>
+        </div>
+        <div class="tab-pane fade" id="tab-doers">
+            <!-- 接单用户表格：用户ID/昵称/赏金/状态/审核结果（未提交留空） -->
+            <div class="table-responsive">
+              <table class="table table-sm align-middle">
+                <thead class="table-light">
+                  <tr>
+                    <th style="width:160px;">用户ID</th>
+                    <th style="width:160px;">昵称</th>
+                    <th style="width:120px;">赏金</th>
+                    <th style="width:120px;">状态</th>
+                    <th>审核结果</th>
+                  </tr>
+                </thead>
+                <tbody id="dDoers"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="tab-pane fade" id="tab-audit">
+            <!-- 审核情况：汇总 + 近期审核记录 -->
+            <div class="row g-3 mb-2">
+              <div class="col-md-3"><div class="p-2 border rounded small bg-light">提交总数：<b id="aTotal">0</b></div></div>
+              <div class="col-md-3"><div class="p-2 border rounded small bg-light">审核中：<b id="aAuditing">0</b></div></div>
+              <div class="col-md-3"><div class="p-2 border rounded small bg-light">已通过：<b id="aApproved">0</b></div></div>
+              <div class="col-md-3"><div class="p-2 border rounded small bg-light">已驳回：<b id="aRejected">0</b></div></div>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-sm align-middle">
+                <thead class="table-light">
+                  <tr>
+                    <th style="width:160px;">时间</th>
+                    <th style="width:160px;">用户ID</th>
+                    <th style="width:140px;">审核结果</th>
+                    <th>备注</th>
+                  </tr>
+                </thead>
+                <tbody id="dAudit"></tbody>
+              </table>
+            </div>
+          </div>
+      </div>
+    </div>
+  </aside>
+  <div id="drawerBackdrop" class="position-fixed top-0 start-0 w-100 h-100" style="background: rgba(0,0,0,.2); z-index:1050;"></div>
+
+  <!-- 脚本 -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // ========== 工具函数（中文注释） ==========
+    function withinRange(ts, tag){
+      // 根据“今日/7日/30日/一年/累计”判断时间范围
+      function days(tag){ if(tag==='d1')return 1; if(tag==='d7')return 7; if(tag==='d30')return 30; if(tag==='y1')return 365; return null; }
+      var d = days(tag); if(!d) return true;
+      var now = new Date(); var from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      var start = new Date(from.getTime() - (d-1)*86400000); var t = new Date(ts);
+      return t>=start && t<=now;
+    }
+    function fmtMoney(n){ return '¥'+Number(n).toFixed(2); }
+
+    // ========== 示例数据（仅保留接单/提交/完成口径） ==========
+    var TASKS = [
+      { id:'T20250915001', category:'短视频关注', bountyPer:1.00, createdAt:'2025-09-13T09:00:00', activeDoers:210, claimed:420, submits:{ total:380, approved:330 }, deadlineHours:72 },
+      { id:'T20250915003', category:'应用安装',   bountyPer:1.50, createdAt:'2025-09-14T01:20:00', activeDoers:96,  claimed:160, submits:{ total:120, approved:90  }, deadlineHours:72 },
+      { id:'T20250914008', category:'电商收藏',   bountyPer:0.60, createdAt:'2025-09-11T13:20:00', activeDoers:148, claimed:260, submits:{ total:180, approved:120 }, deadlineHours:96 },
+      { id:'T20250913009', category:'短视频点赞', bountyPer:0.70, createdAt:'2025-09-08T15:00:00', activeDoers:180, claimed:410, submits:{ total:420, approved:400 }, deadlineHours:120 },
+      { id:'T20250913015', category:'短视频关注', bountyPer:0.30, createdAt:'2025-09-15T09:10:00', activeDoers:70,  claimed:120, submits:{ total:40,  approved:10  }, deadlineHours:72 },
+      { id:'T20250912006', category:'短视频点赞', bountyPer:0.80, createdAt:'2025-09-10T09:00:00', activeDoers:156, claimed:360, submits:{ total:300, approved:240 }, deadlineHours:168 },
+      { id:'T20250911018', category:'应用安装',   bountyPer:1.20, createdAt:'2025-09-10T21:30:00', activeDoers:0,   claimed:0,   submits:{ total:0,   approved:0   }, deadlineHours:72 }
+    ];
+    // 扩充演示数据
+    (function extend(){
+      const cats=['短视频点赞','短视频关注','电商收藏','电商加购','应用安装'];
+      for(let i=0;i<10;i++){
+        const claimed = 40 + (i%5)*40;
+        const submits = Math.round(claimed*0.7);
+        const approved = Math.round(submits*0.85);
+        TASKS.push({
+          id:`T20250913${String(i+31).padStart(2,'0')}`,
+          category:cats[i%5], bountyPer:[0.5,0.6,0.8,1.0,1.2][i%5],
+          createdAt:`2025-09-${String(6+(i%6)).padStart(2,'0')}T0${i%9}:00:00`,
+          activeDoers:Math.max(8, Math.round(claimed*0.4)),
+          claimed, submits:{ total:submits, approved },
+          deadlineHours:[48,72,96,72,120][i%5]
+        });
+      }
+    })();
+
+    // ========== 状态 ==========
+    var state = { range:'d30', gran:'day', pageSize:12, page:1, rows:TASKS.slice(0), filtered:[] };
+
+    // ========== 下拉：任务分类 ==========
+    (function initSelects(){
+      var cats = {}; state.rows.forEach(r=>cats[r.category]=1);
+      var sel = document.getElementById('fCat'); Object.keys(cats).sort().forEach(k=>{ var o=document.createElement('option'); o.value=k; o.textContent=k; sel.appendChild(o); });
+    })();
+
+    // ========== KPI ==========
+    function renderKPI(items){
+      var running = items.length;           // 展示范围内的任务数视作“进行中”
+      var activeDoers=0, claims=0, submits=0, approved=0;
+      items.forEach(t=>{ activeDoers+=t.activeDoers; claims+=t.claimed; submits+=t.submits.total; approved+=t.submits.approved; });
+      var approveRate = submits ? Math.round(approved/submits*100) : 0;
+      document.getElementById('kpiRunning').textContent = running;
+      document.getElementById('kpiActiveDoers').textContent = activeDoers;
+      document.getElementById('kpiClaims').textContent = claims;
+      document.getElementById('kpiSubmits').textContent = submits;
+      document.getElementById('kpiApproved').textContent = approved;
+      document.getElementById('kpiApproveRate').textContent = approveRate+'%';
+    }
+
+    // ========== 图表（趋势/分类占比） ==========
+    var trendChart, pieChart;
+    function groupBy(items, gran){
+      function bucketKey(d){
+        var y=d.getFullYear(), m=('0'+(d.getMonth()+1)).slice(-2), day=('0'+d.getDate()).slice(-2);
+        if(gran==='month') return y+'-'+m;
+        if(gran==='week'){
+          var oneJan=new Date(y,0,1); var numberOfDays=Math.floor((d-oneJan)/86400000);
+          var week=Math.ceil((numberOfDays + oneJan.getDay()+1)/7); return y+'-W'+week;
+        }
+        return y+'-'+m+'-'+day;
+      }
+      var map={};
+      items.forEach(t=>{
+        var k=bucketKey(new Date(t.createdAt));
+        if(!map[k]) map[k]={ claims:0, submits:0, approved:0 };
+        map[k].claims+=t.claimed; map[k].submits+=t.submits.total; map[k].approved+=t.submits.approved;
+      });
+      var labels=Object.keys(map).sort();
+      return { labels, claims:labels.map(k=>map[k].claims), submits:labels.map(k=>map[k].submits), approved:labels.map(k=>map[k].approved) };
+    }
+    function renderCharts(items){
+      if(typeof Chart==='undefined') return;
+      var g=groupBy(items, state.gran);
+      if(trendChart) trendChart.destroy(); if(pieChart) pieChart.destroy();
+      trendChart=new Chart(document.getElementById('trendChart'), {
+        type:'line', data:{ labels:g.labels, datasets:[
+          { label:'接单份数', data:g.claims, tension:.3 },
+          { label:'提交数',   data:g.submits, tension:.3 },
+          { label:'完成数',   data:g.approved, tension:.3 }
+        ]},
+        options:{ responsive:true, plugins:{ legend:{ position:'top' } }, scales:{ y:{ beginAtZero:true } } }
+      });
+      // 分类占比（按接单人数）
+      var catMap={}; items.forEach(t=>{ catMap[t.category]=(catMap[t.category]||0)+t.activeDoers; });
+      var labels=Object.keys(catMap); var vals=labels.map(k=>catMap[k]);
+      pieChart=new Chart(document.getElementById('pieChart'), {
+        type:'pie', data:{ labels:labels, datasets:[{ data:vals }] }, options:{ responsive:true }
+      });
+    }
+
+    // ========== 过滤/排序 ==========
+    function applyFilter(){
+      var kw=(document.getElementById('fKw').value||'').trim().toLowerCase();
+      var cat=document.getElementById('fCat').value;
+      var s=document.getElementById('fStart').value ? new Date(document.getElementById('fStart').value+'T00:00:00') : null;
+      var e=document.getElementById('fEnd').value   ? new Date(document.getElementById('fEnd').value  +'T23:59:59') : null;
+      var sort=document.getElementById('fSort').value;
+
+      state.filtered = state.rows.filter(function(t){
+        if(kw){ var text = [t.id, t.category].join(' ').toLowerCase(); if(text.indexOf(kw)<0) return false; }
+        if(cat && t.category!==cat) return false;
+        var dt=new Date(t.createdAt);
+        if(s && dt<s) return false;
+        if(e && dt>e) return false;
+        if(!withinRange(t.createdAt, state.range)) return false;
+        return true;
+      });
+
+      state.filtered.sort(function(a,b){
+        if(sort==='doers')       return (b.activeDoers) - (a.activeDoers);
+        if(sort==='claims')      return (b.claimed) - (a.claimed);
+        if(sort==='submits')     return (b.submits.total) - (a.submits.total);
+        if(sort==='approved')    return (b.submits.approved) - (a.submits.approved);
+        if(sort==='approveRate'){
+          var ra = a.submits.total? a.submits.approved/a.submits.total : 0;
+          var rb = b.submits.total? b.submits.approved/b.submits.total : 0;
+          return rb - ra;
+        }
+        return new Date(b.createdAt) - new Date(a.createdAt);
+      });
+
+      state.page=1;
+      renderKPI(state.filtered);
+      renderCharts(state.filtered);
+      renderTable();
+    }
+
+    // ========== 表格 ==========
+    function renderTable(){
+      var tbody=document.getElementById('tbodyTasks'); tbody.innerHTML='';
+      var total=state.filtered.length, totalPage=Math.max(1, Math.ceil(total/state.pageSize));
+      document.getElementById('totalCount').textContent = total;
+      document.getElementById('pageTotal').textContent = totalPage;
+      document.getElementById('pageNo').textContent = state.page;
+
+      var start=(state.page-1)*state.pageSize;
+      var rows=state.filtered.slice(start, start+state.pageSize);
+      if(rows.length===0){
+        var tr=document.createElement('tr'); tr.innerHTML='<td colspan="8" class="text-center text-muted py-5">暂无数据</td>'; tbody.appendChild(tr);
+      }else{
+        rows.forEach(function(t){
+          var created = new Date(t.createdAt).getTime();
+          var deadline = created + t.deadlineHours*3600*1000;
+          var leftMs = deadline - Date.now();
+          var leftH = Math.max(0, Math.floor(leftMs/1000/60/60));
+          var approveRate = t.submits.total ? Math.round(t.submits.approved/t.submits.total*100) : 0;
+          var tr = document.createElement('tr');
+          tr.innerHTML = [
+            '<td class="text-mono"><a href="javascript:void(0)" class="link-primary text-decoration-none" data-open="'+t.id+'">'+t.id+'</a><div class="small text-muted">'+new Date(t.createdAt).toLocaleString()+'</div></td>',
+            '<td class="cell-tight"><div class="fw-semibold truncate">'+t.category+'</div></td>',
+            '<td><b>'+t.activeDoers+'</b></td>',
+            '<td><b>'+t.claimed+'</b></td>',
+            '<td class="cell-tight"><div>提交：<b>'+t.submits.total+'</b></div><div>完成：<b>'+t.submits.approved+'</b></div></td>',
+            '<td><b>'+approveRate+'%</b></td>',
+            '<td><span class="countdown '+(leftH<=6?'text-warning':'')+' '+(leftH<=0?'text-danger':'')+'">'+leftH+'h</span></td>',
+            '<td><div class="btn-group"><button class="btn btn-sm btn-outline-primary" data-open="'+t.id+'"><i class="bi bi-eye"></i> 详情</button></div></td>'
+          ].join('');
+          tbody.appendChild(tr);
+        });
+      }
+
+      var pager=document.getElementById('pager'); pager.innerHTML='';
+      function add(page,label,active,disabled){
+        var li=document.createElement('li'); li.className='page-item'+(active?' active':'')+(disabled?' disabled':'');
+        li.innerHTML='<a class="page-link" href="#">'+label+'</a>';
+        li.addEventListener('click', function(e){ e.preventDefault(); if(!disabled){ state.page=page; renderTable(); } });
+        pager.appendChild(li);
+      }
+      add(Math.max(1,state.page-1),'«',false,state.page===1);
+      for(var p=1;p<=totalPage;p++){ if(p===1||p===totalPage||Math.abs(p-state.page)<=1) add(p,p,p===state.page,false); else { var ell=document.createElement('li'); ell.className='page-item disabled'; ell.innerHTML='<span class="page-link">…</span>'; pager.appendChild(ell); } }
+      add(Math.min(totalPage,state.page+1),'»',false,state.page===totalPage);
+
+      tbody.querySelectorAll('[data-open]').forEach(btn=>btn.addEventListener('click',()=>openDrawer(btn.getAttribute('data-open'))));
+      
+    }
+
+    // ========== 抽屉（仅概览与接单用户样例） ==========
+    var CURRENT=null;
+    
+function openDrawer(id){
+  // ===== 查找任务并填充“概览” =====
+  var t=state.rows.find(x=>x.id===id); if(!t) return;
+  CURRENT=t;
+  document.getElementById('dId').textContent=t.id;
+  document.getElementById('dCat').textContent=t.category;
+  document.getElementById('dTime').textContent=new Date(t.createdAt).toLocaleString();
+  document.getElementById('dBounty').textContent=fmtMoney(t.bountyPer);
+  document.getElementById('dDoerCount').textContent=t.activeDoers;
+  document.getElementById('dClaimed').textContent=t.claimed;
+  document.getElementById('dSubmits').textContent=t.submits.total;
+  document.getElementById('dApproved').textContent=t.submits.approved;
+  var rate = t.submits.total ? Math.round(t.submits.approved/t.submits.total*100) : 0;
+  document.getElementById('dProgressBar').style.width = rate+'%';
+  document.getElementById('dRateText').textContent='完成率：'+rate+'%';
+  
+  // ===== 生成“接单用户样本”：每个用户对该任务仅能接 1 单 =====
+  var listDoers = []; // {id, name, bounty, status, audit}
+  var sampleN = Math.min(12, Math.max(4, Math.floor((t.activeDoers||0)/30)));
+  var submitted = Math.min(t.submits.total, Math.max(0, sampleN - Math.round(sampleN*0.3))); // 样本里约 70% 有提交
+  var approved  = Math.min(t.submits.approved, Math.round(submitted * 0.75)); // 样本内约 75% 通过
+  var rejected  = Math.max(0, submitted - approved - Math.floor(submitted*0.15)); // 留一部分待审
+  var auditing  = Math.max(0, submitted - approved - rejected);
+  // 未提交
+  for(var i=0;i<sampleN - submitted;i++){
+    var uid = 'W'+String(10000+i);
+    listDoers.push({ id:uid, name:'接单用户'+String.fromCharCode(65+i), bounty:t.bountyPer, status:'未提交', audit:'' });
+  }
+  // 提交三类
+  var idx=0;
+  function pushWithAudit(label, n){ for(var k=0;k<n;k++){ var uid='W'+String(20000+idx++); listDoers.push({ id:uid, name:'接单用户'+String.fromCharCode(75+idx), bounty:t.bountyPer, status:'已提交', audit:label }); } }
+  pushWithAudit('待审核', auditing);
+  pushWithAudit('已通过', approved);
+  pushWithAudit('已驳回', rejected);
+  // 渲染“接单用户”
+  var dtbody=document.getElementById('dDoers'); dtbody.innerHTML='';
+  listDoers.forEach(function(u){
+    var tr=document.createElement('tr');
+    tr.innerHTML = '<td class="text-mono">'+u.id+'</td>'
+                 + '<td>'+u.name+'</td>'
+                 + '<td>'+fmtMoney(u.bounty)+'</td>'
+                 + '<td>'+u.status+'</td>'
+                 + '<td>'+(u.audit||'')+'</td>';
+    dtbody.appendChild(tr);
+  });
+
+  // ===== 审核情况：汇总 + 最近记录 =====
+  var aTotal = submitted, aApproved = approved, aRejected = rejected, aAuditing = auditing;
+  document.getElementById('aTotal').textContent = aTotal;
+  document.getElementById('aApproved').textContent = aApproved;
+  document.getElementById('aRejected').textContent = aRejected;
+  document.getElementById('aAuditing').textContent = aAuditing;
+  var aBody=document.getElementById('dAudit'); aBody.innerHTML='';
+  var submittedUsers = listDoers.filter(function(x){ return x.status==='已提交'; });
+  var maxRows = Math.min(10, submittedUsers.length);
+  for(var r=0; r<maxRows; r++){
+    var u = submittedUsers[r];
+    var when = new Date(Date.now() - (r*90+30)*60*1000).toLocaleString();
+    var remark = (u.audit==='已通过' ? '凭证校验通过' : (u.audit==='已驳回' ? '截图不合规' : '排队审核中'));
+    var tr=document.createElement('tr');
+    tr.innerHTML = '<td>'+when+'</td>'
+                 + '<td class="text-mono">'+u.id+'</td>'
+                 + '<td>'+u.audit+'</td>'
+                 + '<td class="text-muted">'+remark+'</td>';
+    aBody.appendChild(tr);
+  }
+
+  // ===== 打开抽屉 + 遮罩 =====
+  var dr=document.getElementById('drawer'); dr.classList.add('open'); dr.style.right='0';
+  var bk=document.getElementById('drawerBackdrop'); bk.classList.add('show');
+}
+function closeDrawer(){
+      var dr=document.getElementById('drawer'); dr.classList.remove('open'); dr.style.right='-880px';
+      var bk=document.getElementById('drawerBackdrop'); bk.classList.remove('show');
+      CURRENT=null;
+    }
+
+    // ========== 交互绑定 ==========
+    document.getElementById('btnCloseDrawer').addEventListener('click', closeDrawer);
+    document.getElementById('drawerBackdrop').addEventListener('click', closeDrawer);
+    document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ closeDrawer(); }});
+
+    document.getElementById('topRange').addEventListener('click', function(e){
+      var btn=e.target.closest?e.target.closest('button[data-range]'):null; if(!btn) return;
+      this.querySelectorAll('button').forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active');
+      state.range = btn.getAttribute('data-range');
+      state.page = 1;
+      applyFilter();
+    });
+
+    document.getElementById('trendGroup').addEventListener('click', function(e){
+      var btn=e.target.closest?e.target.closest('button[data-gran]'):null; if(!btn) return;
+      this.querySelectorAll('button').forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active');
+      state.gran = btn.getAttribute('data-gran');
+      renderCharts(state.filtered);
+    });
+
+    document.getElementById('filterForm').addEventListener('submit', function(e){ e.preventDefault(); state.page=1; applyFilter(); });
+    document.getElementById('btnReset').addEventListener('click', function(){
+      document.getElementById('fKw').value=''; document.getElementById('fCat').value='';
+      document.getElementById('fStart').value=''; document.getElementById('fEnd').value=''; document.getElementById('fSort').value='recent';
+      state.page=1; applyFilter();
+    });
+    document.getElementById('btnExport').addEventListener('click', function(){
+      var header=['任务ID','任务分类','接单人数','已接份数','提交数','完成数','创建时间'];
+      var rows=state.filtered.map(function(t){ return [t.id, t.category, t.activeDoers, t.claimed, t.submits.total, t.submits.approved, t.createdAt]; });
+      var csv=header.join(',')+'\\n'+rows.map(r=>r.join(',')).join('\\n');
+      var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+      var url=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download='orders_situation_doer_view.csv'; a.click(); URL.revokeObjectURL(url);
+    });
+    document.getElementById('sidebarToggle').addEventListener('click', function(){ document.querySelector('.sidebar').classList.toggle('show'); });
+
+    // 初始化：关闭抽屉并渲染
+    document.addEventListener('DOMContentLoaded', function(){ closeDrawer(); applyFilter(); });
+  </script>
+<script src="p1-unify.js"></script>
+<script src="p2-unify.js"></script>
+</body>
+</html>

@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>任务接单平台·可接任务列表</title>
+<!-- 依赖（与接单平台保持一致） -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  /* ========== 基础主题色（中文注释） ========== */
+  :root{ --primary:#3b7ddd; --primary-light:#e8f0fe; --white:#fff; --light:#f5f6f8; --border:#e2e8f0; }
+  body{ background:var(--light); color:#2d3748; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+
+  /* 顶部与侧边（与 doer-team 系列统一） */
+  .navbar{ background:var(--white); border-bottom:1px solid var(--border); box-shadow:0 2px 10px rgba(0,0,0,.05); position:fixed; top:0; left:0; right:0; z-index:1030; padding-left:250px; }
+  .navbar-brand{ color:var(--primary); font-weight:700; }
+  .sidebar{ background:var(--white); height:100vh; position:fixed; left:0; top:0; width:250px; padding-top:60px; border-right:1px solid var(--border); box-shadow:2px 0 10px rgba(0,0,0,.05); overflow-y:auto; z-index:1000; }
+  .sidebar .nav-link{ color:#4a5568; padding:.8rem 1rem; margin:.1rem .5rem; border-radius:6px; display:flex; align-items:center; transition:all .2s; }
+  .sidebar .nav-link i{ margin-right:10px; color:#718096; }
+  .sidebar .nav-link:hover, .sidebar .nav-link.active{ color:var(--primary); background:var(--primary-light); }
+  .nav-section{ margin:.75rem .25rem .25rem; font-size:.8125rem; color:#6c757d; display:flex; align-items:center; gap:.5rem; }
+  .nav-section .dot{ width:10px; height:10px; border-radius:2px; display:inline-block; }
+  .dot--platform{ background:#0d6efd; } .dot--task{ background:#20c997; } .dot--user{ background:#fd7e14; } .dot--settings{ background:#6f42c1; }
+  .main{ margin-left:250px; padding:20px; padding-top:80px; }
+  @media (max-width: 992px){
+    .sidebar{ width:80px; padding-top:70px; }
+    .sidebar .nav-link span{ display:none; }
+    .sidebar .nav-link i{ margin-right:0; font-size:1.2rem; }
+    .navbar{ padding-left:80px; }
+    .main{ margin-left:80px; }
+  }
+  @media (max-width: 768px){
+    .sidebar{ transform: translateX(-100%); width:250px; }
+    .sidebar.show{ transform: translateX(0); }
+    .navbar{ padding-left:15px; }
+    .main{ margin-left:0; }
+    .navbar-toggler{ display:block; }
+  }
+  .navbar-toggler{ display:none; border:none; font-size:1.25rem; }
+  .navbar-toggler:focus{ box-shadow:none; }
+
+  .dashboard-card{ background:var(--white); border:none; border-radius:10px; box-shadow:0 4px 6px rgba(0,0,0,.04); }
+  .card-header{ background:var(--white); border-bottom:1px solid var(--border); font-weight:600; padding:1rem 1.25rem; }
+  .card-body{ padding:1rem 1.25rem; }
+  .btn{ border-radius:6px; font-weight:500; }
+
+  /* 表格密实布局 + 不换行 */
+  .table-sm td,.table-sm th{ padding:.45rem .5rem; vertical-align:middle; white-space:nowrap; }
+  .text-mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+  .cell-tight{ font-size:13px; line-height:1.2; }
+
+  /* 右侧抽屉（相对窄一些，避免压迫感） */
+  #drawer{ right:-760px; }
+  #drawer.open{ right:0; }
+  #drawerBackdrop{ display:none; }
+  #drawerBackdrop.show{ display:block; }
+</style>
+<link rel="stylesheet" href="p1-unify.css"/>
+<link rel="stylesheet" href="p2-unify.css"/>
+</head>
+<body>
+  <!-- 顶部（与仪表盘一致：铃铛 + 用户下拉） -->
+  <nav class="navbar navbar-expand-lg navbar-light">
+    <div class="container-fluid">
+      <button id="sidebarToggle" class="navbar-toggler" type="button"><span class="navbar-toggler-icon"></span></button>
+      <a class="navbar-brand" href="doer-team-analytics-dashboard.html">
+        <strong><i class="bi bi-lightning-charge me-2"></i>任务接单管理平台</strong>
+      </a>
+      <div class="collapse navbar-collapse">
+        <ul class="navbar-nav ms-auto me-4">
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" id="notifDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false" href="#">
+              <i class="bi bi-bell"></i><span class="badge bg-danger ms-1">3</span>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="#"><i class="bi bi-list-task me-2"></i>有 5 个新任务已上线</a></li>
+              <li><a class="dropdown-item" href="#"><i class="bi bi-clock-history me-2"></i>2 个任务即将截止</a></li>
+              <li><hr class="dropdown-divider"/></li>
+              <li><a class="dropdown-item" href="#" id="viewAllNotifications"><i class="bi bi-list-ul me-2"></i>查看所有通知</a></li>
+            </ul>
+          </li>
+          <li class="nav-item dropdown ms-2">
+            <a class="nav-link dropdown-toggle d-flex align-items-center" data-bs-toggle="dropdown" href="#" role="button">
+              <i class="bi bi-person-circle me-2"></i> 接单管理员
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="doer-team-account-management.html"><i class="bi bi-person-gear me-2"></i>账号与安全</a></li>
+              <li><hr class="dropdown-divider"/></li>
+              <li><a class="dropdown-item" href="#"><i class="bi bi-box-arrow-right me-2"></i>退出</a></li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 侧边栏（当前页高亮：可接任务列表） -->
+  <aside class="sidebar">
+    <ul class="nav flex-column">
+      <li class="nav-section"><span class="dot dot--platform"></span><span>平台</span></li>
+      <li><a class="nav-link" href="doer-team-analytics-dashboard.html"><i class="bi bi-speedometer2 me-2"></i><span>平台总仪表盘</span></a></li>
+      <li><a class="nav-link" href="doer-team-finance-platform-fund-flow.html"><i class="bi bi-cash-coin me-2"></i><span>平台资金流水</span></a></li>
+
+      <li class="nav-section"><span class="dot dot--task"></span><span>任务</span></li>
+      <li><a class="nav-link" href="doer-team-orders-situation.html"><i class="bi bi-cart-check me-2"></i><span>任务接单情况</span></a></li>
+      <li><a class="nav-link" href="doer-team-tasks-completion.html"><i class="bi bi-check2-circle me-2"></i><span>任务完成情况</span></a></li>
+      <li><a class="nav-link active" href="doer-team-tasks-list.html"><i class="bi bi-list-task me-2"></i><span>可接任务列表</span></a></li>
+
+      <li class="nav-section"><span class="dot dot--user"></span><span>用户</span></li>
+      <li><a class="nav-link" href="doer-team-users-list.html"><i class="bi bi-people me-2"></i><span>平台用户列表</span></a></li>
+      <li><a class="nav-link" href="doer-team-finance-withdrawal-list.html"><i class="bi bi-bank me-2"></i><span>用户提现列表</span></a></li>
+      <li><a class="nav-link" href="doer-team-finance-user-fund-flow.html"><i class="bi bi-journal-text me-2"></i><span>用户资金流水</span></a></li>
+
+      <li class="nav-section"><span class="dot dot--settings"></span><span>设置</span></li>
+      <li><a class="nav-link" href="doer-team-settings-categories.html"><i class="bi bi-sliders me-2"></i><span>业务分类概览</span></a></li>
+      <li><a class="nav-link" href="doer-team-system-api-monitoring.html"><i class="bi bi-activity me-2"></i><span>接口管理监控</span></a></li>
+      <li><a class="nav-link" href="doer-team-finance-payment-account.html"><i class="bi bi-credit-card me-2"></i><span>支付账户设置</span></a></li>
+      <li><a class="nav-link" href="doer-team-account-management.html"><i class="bi bi-person-gear me-2"></i><span>账号管理设置</span></a></li>
+      <li><a class="nav-link" href="doer-team-team-profile.html"><i class="bi bi-building-gear me-2"></i><span>团队资料设置</span></a></li>
+    </ul>
+  </aside>
+
+  <!-- 主内容 -->
+  <main class="main">
+    <!-- 顶部快捷标签（供给视角，不展示逐用户） -->
+    <div class="row g-2 mb-3">
+      <div class="col-auto">
+        <div id="quickTags" class="btn-group btn-group-sm">
+          <button class="btn btn-outline-primary active" data-tag="all">全部</button>
+          <button class="btn btn-outline-primary" data-tag="ongoing">进行中</button>
+          <button class="btn btn-outline-primary" data-tag="expiring">即将到期</button>
+          <button class="btn btn-outline-primary" data-tag="lowstock">库存告急</button>
+          <button class="btn btn-outline-primary" data-tag="new">新上线</button>
+        </div>
+      </div>
+      <div class="col-auto small text-muted align-self-center">在线任务数：<b id="statOnline">0</b></div>
+    </div>
+
+    <!-- 筛选表单 -->
+    <div class="card p-3 mb-3 dashboard-card">
+      <form id="filterForm" class="row g-3 align-items-end">
+        <div class="col-md-4">
+          <label class="form-label small text-muted">关键词</label>
+          <input id="fKw" type="text" class="form-control form-control-sm" placeholder="任务ID / 任务分类"/>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small text-muted">任务分类</label>
+          <select id="fCat" class="form-select form-select-sm"><option value="">全部</option></select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small text-muted">单价最小</label>
+          <input id="fMin" type="number" min="0" step="0.1" class="form-control form-control-sm" placeholder="¥"/>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small text-muted">单价最大</label>
+          <input id="fMax" type="number" min="0" step="0.1" class="form-control form-control-sm" placeholder="¥"/>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small text-muted">排序</label>
+          <select id="fSort" class="form-select form-select-sm">
+            <option value="recent">最近上线</option>
+            <option value="bounty">单价（高→低）</option>
+            <option value="remain">剩余（高→低）</option>
+            <option value="deadline">截止时间（近→远）</option>
+          </select>
+        </div>
+        <div class="col-12 d-flex gap-2">
+          <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-funnel"></i> 应用筛选</button>
+          <button id="btnReset" type="button" class="btn btn-outline-secondary btn-sm">重置</button>
+          <button id="btnExport" type="button" class="btn btn-outline-primary btn-sm"><i class="bi bi-download"></i> 导出 CSV</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- 列表（不换行 + 固定列宽） -->
+    <div class="dashboard-card card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <div>可接任务列表（<span id="totalCount">0</span>）</div>
+        <div class="small text-muted">每页 12 条</div>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover table-sm align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th style="width:150px;">任务ID</th>
+                <th style="width:220px;">任务分类</th>
+                <th style="width:120px;">单价（元/份）</th>
+                <th style="width:110px;">总量</th>
+                <th style="width:110px;">已接</th>
+                <th style="width:110px;">剩余</th>
+                <th style="width:160px;">截止</th>
+                <th style="width:110px;">时长(h)</th>
+                <th style="width:110px;">状态</th>
+                <th style="width:120px;">操作</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyTasks"></tbody>
+          </table>
+        </div>
+        <div class="d-flex justify-content-between align-items-center p-2">
+          <div class="small text-muted">当前第 <span id="pageNo">1</span> / <span id="pageTotal">1</span> 页</div>
+          <nav><ul id="pager" class="pagination pagination-sm mb-0"></ul></nav>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- 任务详情抽屉（在线任务视角） -->
+  <aside id="drawer" class="position-fixed top-0 bottom-0 bg-white border-start" style="width: 740px; box-shadow:-8px 0 24px rgba(0,0,0,.08); z-index:1060; transition:right .25s;">
+    <div class="d-flex align-items-center justify-content-between border-bottom p-2">
+      <div class="d-flex align-items-center gap-2"><h6 class="mb-0">任务概览（在线任务）</h6></div>
+      <button id="btnCloseDrawer" class="btn btn-sm btn-outline-secondary"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="p-3" style="overflow:auto; height: calc(100% - 48px);">
+      <div class="row g-3 mb-2">
+        <div class="col-md-6"><div class="small text-muted">任务ID</div><div class="fw-semibold" id="dId">—</div></div>
+        <div class="col-md-6"><div class="small text-muted">任务分类</div><div class="fw-semibold" id="dCat">—</div></div>
+        <div class="col-md-6"><div class="small text-muted">上线时间</div><div class="fw-semibold" id="dTime">—</div></div>
+        <div class="col-md-6"><div class="small text-muted">领取截止</div><div class="fw-semibold" id="dDeadline">—</div></div>
+        <div class="col-md-3"><div class="small text-muted">单价</div><div class="fw-semibold" id="dBounty">—</div></div>
+        <div class="col-md-3"><div class="small text-muted">总量</div><div class="fw-semibold" id="dTotal">—</div></div>
+        <div class="col-md-3"><div class="small text-muted">已接</div><div class="fw-semibold" id="dClaimed">—</div></div>
+        <div class="col-md-3"><div class="small text-muted">剩余</div><div class="fw-semibold" id="dRemain">—</div></div>
+        <div class="col-md-6"><div class="small text-muted">接单限制</div><div class="fw-semibold" id="dLimit">—</div></div>
+        <div class="col-md-6"><div class="small text-muted">状态</div><div class="fw-semibold" id="dStatus">—</div></div>
+      </div>
+      <div class="small text-muted">说明：此处仅展示“在线任务”的供给信息，用于接单管理员宏观了解库存与时效。</div>
+    </div>
+  </aside>
+  <div id="drawerBackdrop" class="position-fixed top-0 start-0 w-100 h-100" style="background: rgba(0,0,0,.2); z-index:1050;"></div>
+
+  <!-- JS：渲染逻辑（中文注释） -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // ===================== 模拟数据（仅供给视角） =====================
+    var TASKS = [
+  {
+    "id": "T20250901100",
+    "category": "短视频关注",
+    "bountyPer": 0.5,
+    "total": 1000,
+    "claimed": 49,
+    "deadline": "2025-09-12 08:00",
+    "createdAt": "2025-09-07 08:00",
+    "durationHours": 120,
+    "status": "已结束",
+    "limit": "每人2份"
+  },
+  {
+    "id": "T20250902101",
+    "category": "线下打卡",
+    "bountyPer": 0.5,
+    "total": 200,
+    "claimed": 9,
+    "deadline": "2025-09-06 11:00",
+    "createdAt": "2025-08-30 11:00",
+    "durationHours": 168,
+    "status": "已结束",
+    "limit": "实名+手机号"
+  },
+  {
+    "id": "T20250903102",
+    "category": "短视频关注",
+    "bountyPer": 0.5,
+    "total": 800,
+    "claimed": 434,
+    "deadline": "2025-09-17 05:00",
+    "createdAt": "2025-09-15 05:00",
+    "durationHours": 48,
+    "status": "已结束",
+    "limit": "每人1份"
+  },
+  {
+    "id": "T20250904103",
+    "category": "线下打卡",
+    "bountyPer": 1.2,
+    "total": 100,
+    "claimed": 73,
+    "deadline": "2025-09-03 16:00",
+    "createdAt": "2025-08-27 16:00",
+    "durationHours": 168,
+    "status": "已结束",
+    "limit": "无限制"
+  },
+  {
+    "id": "T20250905104",
+    "category": "电商收藏",
+    "bountyPer": 1.0,
+    "total": 200,
+    "claimed": 74,
+    "deadline": "2025-09-17 11:00",
+    "createdAt": "2025-09-10 11:00",
+    "durationHours": 168,
+    "status": "已结束",
+    "limit": "新用户专属"
+  },
+  {
+    "id": "T20250906105",
+    "category": "短视频关注",
+    "bountyPer": 0.6,
+    "total": 800,
+    "claimed": 698,
+    "deadline": "2025-09-17 18:00",
+    "createdAt": "2025-09-13 18:00",
+    "durationHours": 96,
+    "status": "进行中",
+    "limit": "新用户专属"
+  },
+  {
+    "id": "T20250907106",
+    "category": "短视频关注",
+    "bountyPer": 1.2,
+    "total": 300,
+    "claimed": 49,
+    "deadline": "2025-09-01 16:00",
+    "createdAt": "2025-08-29 16:00",
+    "durationHours": 72,
+    "status": "已结束",
+    "limit": "新用户专属"
+  },
+  {
+    "id": "T20250908107",
+    "category": "线下打卡",
+    "bountyPer": 1.2,
+    "total": 500,
+    "claimed": 348,
+    "deadline": "2025-09-18 17:00",
+    "createdAt": "2025-09-15 17:00",
+    "durationHours": 72,
+    "status": "进行中",
+    "limit": "每人2份"
+  },
+  {
+    "id": "T20250909108",
+    "category": "电商收藏",
+    "bountyPer": 0.6,
+    "total": 300,
+    "claimed": 153,
+    "deadline": "2025-09-07 18:00",
+    "createdAt": "2025-09-02 18:00",
+    "durationHours": 120,
+    "status": "已结束",
+    "limit": "每人1份"
+  },
+  {
+    "id": "T20250910109",
+    "category": "直播互动",
+    "bountyPer": 0.8,
+    "total": 800,
+    "claimed": 506,
+    "deadline": "2025-09-18 18:00",
+    "createdAt": "2025-09-14 18:00",
+    "durationHours": 96,
+    "status": "进行中",
+    "limit": "每人2份"
+  },
+  {
+    "id": "T20250911110",
+    "category": "问卷调查",
+    "bountyPer": 0.6,
+    "total": 800,
+    "claimed": 428,
+    "deadline": "2025-08-31 10:00",
+    "createdAt": "2025-08-29 10:00",
+    "durationHours": 48,
+    "status": "已结束",
+    "limit": "每人1份"
+  },
+  {
+    "id": "T20250912111",
+    "category": "问卷调查",
+    "bountyPer": 2.0,
+    "total": 1000,
+    "claimed": 79,
+    "deadline": "2025-09-03 23:00",
+    "createdAt": "2025-09-01 23:00",
+    "durationHours": 48,
+    "status": "已结束",
+    "limit": "每人2份"
+  },
+  {
+    "id": "T20250913112",
+    "category": "短视频关注",
+    "bountyPer": 0.5,
+    "total": 800,
+    "claimed": 467,
+    "deadline": "2025-09-10 17:00",
+    "createdAt": "2025-09-05 17:00",
+    "durationHours": 120,
+    "status": "已结束",
+    "limit": "每人2份"
+  },
+  {
+    "id": "T20250914113",
+    "category": "直播互动",
+    "bountyPer": 0.8,
+    "total": 100,
+    "claimed": 89,
+    "deadline": "2025-09-03 14:00",
+    "createdAt": "2025-09-01 14:00",
+    "durationHours": 48,
+    "status": "已结束",
+    "limit": "每人2份"
+  },
+  {
+    "id": "T20250915114",
+    "category": "电商收藏",
+    "bountyPer": 0.8,
+    "total": 100,
+    "claimed": 59,
+    "deadline": "2025-09-08 15:00",
+    "createdAt": "2025-09-04 15:00",
+    "durationHours": 96,
+    "status": "已结束",
+    "limit": "新用户专属"
+  },
+  {
+    "id": "T20250916115",
+    "category": "电商加购",
+    "bountyPer": 0.6,
+    "total": 200,
+    "claimed": 73,
+    "deadline": "2025-09-15 21:00",
+    "createdAt": "2025-09-13 21:00",
+    "durationHours": 48,
+    "status": "已结束",
+    "limit": "实名+手机号"
+  },
+  {
+    "id": "T20250917116",
+    "category": "应用安装",
+    "bountyPer": 1.0,
+    "total": 200,
+    "claimed": 114,
+    "deadline": "2025-09-06 21:00",
+    "createdAt": "2025-09-04 21:00",
+    "durationHours": 48,
+    "status": "已结束",
+    "limit": "每人1份"
+  },
+  {
+    "id": "T20250918117",
+    "category": "线下打卡",
+    "bountyPer": 0.8,
+    "total": 1000,
+    "claimed": 425,
+    "deadline": "2025-09-07 19:00",
+    "createdAt": "2025-09-03 19:00",
+    "durationHours": 96,
+    "status": "已结束",
+    "limit": "每人1份"
+  },
+  {
+    "id": "T20250919118",
+    "category": "电商加购",
+    "bountyPer": 1.5,
+    "total": 200,
+    "claimed": 59,
+    "deadline": "2025-09-16 10:00",
+    "createdAt": "2025-09-13 10:00",
+    "durationHours": 72,
+    "status": "已结束",
+    "limit": "无限制"
+  },
+  {
+    "id": "T20250920119",
+    "category": "电商收藏",
+    "bountyPer": 0.5,
+    "total": 300,
+    "claimed": 144,
+    "deadline": "2025-09-04 18:00",
+    "createdAt": "2025-09-01 18:00",
+    "durationHours": 72,
+    "status": "已结束",
+    "limit": "实名+手机号"
+  },
+  {
+    "id": "T20250921120",
+    "category": "短视频点赞",
+    "bountyPer": 0.6,
+    "total": 800,
+    "claimed": 326,
+    "deadline": "2025-09-07 01:00",
+    "createdAt": "2025-08-31 01:00",
+    "durationHours": 168,
+    "status": "已结束",
+    "limit": "实名+手机号"
+  },
+  {
+    "id": "T20250922121",
+    "category": "直播互动",
+    "bountyPer": 0.5,
+    "total": 500,
+    "claimed": 201,
+    "deadline": "2025-09-05 00:00",
+    "createdAt": "2025-08-31 00:00",
+    "durationHours": 120,
+    "status": "已结束",
+    "limit": "实名+手机号"
+  },
+  {
+    "id": "T20250923122",
+    "category": "短视频关注",
+    "bountyPer": 0.6,
+    "total": 200,
+    "claimed": 112,
+    "deadline": "2025-09-18 06:00",
+    "createdAt": "2025-09-16 06:00",
+    "durationHours": 48,
+    "status": "进行中",
+    "limit": "每人2份"
+  },
+  {
+    "id": "T20250924123",
+    "category": "短视频关注",
+    "bountyPer": 0.6,
+    "total": 100,
+    "claimed": 72,
+    "deadline": "2025-08-31 11:00",
+    "createdAt": "2025-08-29 11:00",
+    "durationHours": 48,
+    "status": "已结束",
+    "limit": "每人2份"
+  },
+  {
+    "id": "T20250925124",
+    "category": "电商收藏",
+    "bountyPer": 1.0,
+    "total": 200,
+    "claimed": 157,
+    "deadline": "2025-08-31 12:00",
+    "createdAt": "2025-08-29 12:00",
+    "durationHours": 48,
+    "status": "已结束",
+    "limit": "每人2份"
+  },
+  {
+    "id": "T20250926125",
+    "category": "直播互动",
+    "bountyPer": 0.5,
+    "total": 500,
+    "claimed": 62,
+    "deadline": "2025-09-09 17:00",
+    "createdAt": "2025-09-05 17:00",
+    "durationHours": 96,
+    "status": "已结束",
+    "limit": "实名+手机号"
+  },
+  {
+    "id": "T20250927126",
+    "category": "问卷调查",
+    "bountyPer": 0.5,
+    "total": 100,
+    "claimed": 18,
+    "deadline": "2025-09-05 21:00",
+    "createdAt": "2025-09-01 21:00",
+    "durationHours": 96,
+    "status": "已结束",
+    "limit": "每人2份"
+  },
+  {
+    "id": "T20250928127",
+    "category": "问卷调查",
+    "bountyPer": 0.6,
+    "total": 800,
+    "claimed": 23,
+    "deadline": "2025-09-04 14:00",
+    "createdAt": "2025-09-01 14:00",
+    "durationHours": 72,
+    "status": "已结束",
+    "limit": "每人1份"
+  },
+  {
+    "id": "T20250929128",
+    "category": "应用安装",
+    "bountyPer": 1.5,
+    "total": 300,
+    "claimed": 46,
+    "deadline": "2025-09-07 12:00",
+    "createdAt": "2025-08-31 12:00",
+    "durationHours": 168,
+    "status": "已结束",
+    "limit": "新用户专属"
+  },
+  {
+    "id": "T20250930129",
+    "category": "问卷调查",
+    "bountyPer": 1.2,
+    "total": 200,
+    "claimed": 136,
+    "deadline": "2025-09-10 07:00",
+    "createdAt": "2025-09-06 07:00",
+    "durationHours": 96,
+    "status": "已结束",
+    "limit": "每人1份"
+  },
+  {
+    "id": "T20250901130",
+    "category": "电商加购",
+    "bountyPer": 2.0,
+    "total": 500,
+    "claimed": 378,
+    "deadline": "2025-09-01 06:00",
+    "createdAt": "2025-08-29 06:00",
+    "durationHours": 72,
+    "status": "已结束",
+    "limit": "每人1份"
+  },
+  {
+    "id": "T20250902131",
+    "category": "应用安装",
+    "bountyPer": 0.5,
+    "total": 1000,
+    "claimed": 29,
+    "deadline": "2025-09-04 21:00",
+    "createdAt": "2025-08-31 21:00",
+    "durationHours": 96,
+    "status": "已结束",
+    "limit": "实名+手机号"
+  },
+  {
+    "id": "T20250903132",
+    "category": "问卷调查",
+    "bountyPer": 2.0,
+    "total": 300,
+    "claimed": 228,
+    "deadline": "2025-09-16 06:00",
+    "createdAt": "2025-09-09 06:00",
+    "durationHours": 168,
+    "status": "已结束",
+    "limit": "每人2份"
+  },
+  {
+    "id": "T20250904133",
+    "category": "问卷调查",
+    "bountyPer": 0.6,
+    "total": 200,
+    "claimed": 120,
+    "deadline": "2025-09-17 05:00",
+    "createdAt": "2025-09-15 05:00",
+    "durationHours": 48,
+    "status": "已结束",
+    "limit": "每人1份"
+  },
+  {
+    "id": "T20250905134",
+    "category": "问卷调查",
+    "bountyPer": 1.5,
+    "total": 100,
+    "claimed": 61,
+    "deadline": "2025-09-08 17:00",
+    "createdAt": "2025-09-01 17:00",
+    "durationHours": 168,
+    "status": "已结束",
+    "limit": "无限制"
+  },
+  {
+    "id": "T20250906135",
+    "category": "问卷调查",
+    "bountyPer": 1.0,
+    "total": 500,
+    "claimed": 91,
+    "deadline": "2025-09-17 00:00",
+    "createdAt": "2025-09-14 00:00",
+    "durationHours": 72,
+    "status": "已结束",
+    "limit": "无限制"
+  }
+];
+
+    // ===================== 状态与工具 =====================
+    var state = {
+      tag:'all', pageSize:12, page:1,
+      kw:'', cat:'', min:null, max:null, sort:'recent'
+    };
+    function remainOf(r){ return Math.max(0, (r.total||0) - (r.claimed||0)); }
+    function isNew(r){ return hoursSince(r.createdAt) <= 48; }
+    function hoursSince(ts){ var t=new Date(ts); return (Date.now()-t.getTime())/36e5; }
+    function isExpiring(r){
+      var d = new Date(r.deadline); return (d.getTime() - Date.now())/36e5 <= 24 && d > new Date();
+    }
+    function isOngoing(r){ return new Date(r.deadline) > new Date(); }
+    function isLowStock(r){
+      var rem = remainOf(r); return r.total>0 && (rem/r.total) <= 0.1 && rem>0;
+    }
+
+    // ===================== 初始化筛选控件 =====================
+    (function initSelects(){
+      var cats = {}; TASKS.forEach(r=>cats[r.category]=1);
+      var sel=document.getElementById('fCat'); Object.keys(cats).sort().forEach(k=>{
+        var opt=document.createElement('option'); opt.value=k; opt.textContent=k; sel.appendChild(opt);
+      });
+    })();
+
+    // ===================== 渲染核心 =====================
+    function applyFilters(){
+      var rows = TASKS.slice(0);
+      // 快捷标签
+      rows = rows.filter(r=>{
+        if(state.tag==='ongoing') return isOngoing(r);
+        if(state.tag==='expiring') return isExpiring(r);
+        if(state.tag==='lowstock') return isLowStock(r);
+        if(state.tag==='new') return isNew(r);
+        return true;
+      });
+      // 关键词
+      if(state.kw){
+        var kw = state.kw.trim();
+        rows = rows.filter(r => r.id.includes(kw) || r.category.includes(kw));
+      }
+      // 分类
+      if(state.cat) rows = rows.filter(r=> r.category===state.cat);
+      // 单价范围
+      if(state.min!=null && state.min!=='') rows = rows.filter(r=> Number(r.bountyPer) >= Number(state.min));
+      if(state.max!=null && state.max!=='') rows = rows.filter(r=> Number(r.bountyPer) <= Number(state.max));
+      // 排序
+      rows.sort((a,b)=>{
+        if(state.sort==='recent') return new Date(b.createdAt)-new Date(a.createdAt);
+        if(state.sort==='bounty') return b.bountyPer - a.bountyPer;
+        if(state.sort==='remain') return remainOf(b) - remainOf(a);
+        if(state.sort==='deadline') return new Date(a.deadline)-new Date(b.deadline);
+        return 0;
+      });
+      state.filtered = rows;
+      document.getElementById('statOnline').textContent = rows.filter(isOngoing).length;
+      renderPage(1);
+    }
+
+    function renderPage(p){
+      state.page = p;
+      var total = state.filtered.length;
+      var pageTotal = Math.max(1, Math.ceil(total/state.pageSize));
+      var start = (p-1)*state.pageSize;
+      var pageRows = state.filtered.slice(start, start+state.pageSize);
+      document.getElementById('totalCount').textContent = total;
+      document.getElementById('pageNo').textContent = p;
+      document.getElementById('pageTotal').textContent = pageTotal;
+
+      var tbody = document.getElementById('tbodyTasks'); tbody.innerHTML = '';
+      pageRows.forEach(r=>{
+        var tr=document.createElement('tr');
+        tr.innerHTML = `
+          <td class="text-mono">${r.id}</td>
+          <td>${r.category}</td>
+          <td>¥ ${r.bountyPer.toFixed(2)}</td>
+          <td>${r.total}</td>
+          <td>${r.claimed}</td>
+          <td>${remainOf(r)}</td>
+          <td>${r.deadline}</td>
+          <td>${r.durationHours}</td>
+          <td>${isOngoing(r) ? '进行中' : '已结束'}</td>
+          <td><button class="btn btn-sm btn-outline-primary" data-id="${r.id}">详情</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+      // 绑定详情按钮
+      tbody.querySelectorAll('button[data-id]').forEach(btn=> btn.addEventListener('click', ()=> openDrawer(btn.getAttribute('data-id')) ));
+
+      // 渲染分页
+      var pager = document.getElementById('pager'); pager.innerHTML='';
+      function addPage(i, active){
+        var li=document.createElement('li'); li.className='page-item'+(active?' active':'');
+        li.innerHTML=`<a class="page-link" href="#">${i}</a>`;
+        li.addEventListener('click', (e)=>{ e.preventDefault(); renderPage(i); });
+        pager.appendChild(li);
+      }
+      for(var i=1;i<=pageTotal;i++) addPage(i, i===p);
+    }
+
+    // ===================== 抽屉 =====================
+    function openDrawer(id){
+      var r = TASKS.find(x=>x.id===id); if(!r) return;
+      document.getElementById('dId').textContent = r.id;
+      document.getElementById('dCat').textContent = r.category;
+      document.getElementById('dTime').textContent = r.createdAt;
+      document.getElementById('dDeadline').textContent = r.deadline;
+      document.getElementById('dBounty').textContent = '¥ '+r.bountyPer.toFixed(2);
+      document.getElementById('dTotal').textContent = r.total;
+      document.getElementById('dClaimed').textContent = r.claimed;
+      document.getElementById('dRemain').textContent = remainOf(r);
+      document.getElementById('dLimit').textContent = r.limit;
+      document.getElementById('dStatus').textContent = isOngoing(r) ? '进行中' : '已结束';
+      document.getElementById('drawer').classList.add('open');
+      document.getElementById('drawerBackdrop').classList.add('show');
+    }
+    document.getElementById('btnCloseDrawer').addEventListener('click', ()=>{
+      document.getElementById('drawer').classList.remove('open');
+      document.getElementById('drawerBackdrop').classList.remove('show');
+    });
+    document.getElementById('drawerBackdrop').addEventListener('click', ()=>{
+      document.getElementById('btnCloseDrawer').click();
+    });
+
+    // ===================== 事件绑定：快捷标签/筛选/导出 =====================
+    document.querySelectorAll('#quickTags .btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        document.querySelectorAll('#quickTags .btn').forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        state.tag = btn.getAttribute('data-tag'); applyFilters();
+      });
+    });
+
+    document.getElementById('filterForm').addEventListener('submit', function(e){
+      e.preventDefault();
+      state.kw = document.getElementById('fKw').value;
+      state.cat = document.getElementById('fCat').value;
+      state.min = document.getElementById('fMin').value;
+      state.max = document.getElementById('fMax').value;
+      state.sort = document.getElementById('fSort').value;
+      applyFilters();
+    });
+    document.getElementById('btnReset').addEventListener('click', ()=>{
+      document.getElementById('fKw').value='';
+      document.getElementById('fCat').value='';
+      document.getElementById('fMin').value='';
+      document.getElementById('fMax').value='';
+      document.getElementById('fSort').value='recent';
+      state = Object.assign(state, { kw:'', cat:'', min:null, max:null, sort:'recent', tag:document.querySelector('#quickTags .btn.active').getAttribute('data-tag') });
+      applyFilters();
+    });
+
+    document.getElementById('btnExport').addEventListener('click', function(){
+      var rows = state.filtered||TASKS;
+      var head = ['任务ID','任务分类','单价','总量','已接','剩余','截止','时长(h)','状态','接单限制'];
+      var csv = [head.join(',')];
+      rows.forEach(r=>{
+        csv.push([r.id, r.category, r.bountyPer.toFixed(2), r.total, r.claimed, remainOf(r), r.deadline, r.durationHours, (isOngoing(r)?'进行中':'已结束'), r.limit].join(','));
+      });
+      var blob = new Blob(['\ufeff'+csv.join('\n')], {type:'text/csv;charset=utf-8;'});
+      var url = URL.createObjectURL(blob);
+      var a=document.createElement('a'); a.href=url; a.download='在线任务列表.csv'; a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    // ===================== 启动渲染 =====================
+    applyFilters();
+  </script>
+<script src="p1-unify.js"></script>
+<script src="p2-unify.js"></script>
+</body>
+</html>

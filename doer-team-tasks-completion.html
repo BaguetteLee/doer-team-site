@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>任务接单平台·任务完成情况</title>
+  <!-- 统一依赖：Bootstrap / Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css"/>
+  <style>
+    :root{
+      /* 统一色板（与平台资金流水页保持一致） */
+      --primary:#3b7ddd; --primary-light:#e8f0fe; --secondary:#6c757d;
+      --red:#dc3545; --green:#28a745; --white:#fff; --light:#f5f6f8;
+      --dark:#343a40; --border:#e2e8f0;
+    }
+    body{ background:var(--light); color:#2d3748; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    /* 顶部导航与侧边栏（保持一致） */
+    .navbar{ background:var(--white); border-bottom:1px solid var(--border); box-shadow:0 2px 10px rgba(0,0,0,.05); position:fixed; top:0; left:0; right:0; z-index:1030; padding-left:250px;}
+    .navbar-brand{ color:var(--primary); font-weight:700; }
+    .sidebar{ background:var(--white); height:100vh; position:fixed; left:0; top:0; width:250px; padding-top:60px; border-right:1px solid var(--border); box-shadow:2px 0 10px rgba(0,0,0,.05); overflow-y:auto; z-index:1000;}
+    .sidebar .nav-link{ color:#4a5568; padding:.8rem 1rem; margin:.1rem .5rem; border-radius:6px; display:flex; align-items:center; transition:all .2s; }
+    .sidebar .nav-link i{ margin-right:10px; color:#718096; }
+    .sidebar .nav-link:hover, .sidebar .nav-link.active{ color:var(--primary); background:var(--primary-light); }
+    .sidebar .nav-link.active i, .sidebar .nav-link:hover i{ color:var(--primary); }
+    .nav-section{ margin:.75rem .25rem .25rem; font-size:.8125rem; color:#6c757d; display:flex; align-items:center; gap:.5rem; }
+    .nav-section .dot{ width:10px; height:10px; border-radius:2px; display:inline-block; }
+    .dot--platform{ background:#0d6efd; } .dot--task{ background:#20c997; } .dot--user{ background:#fd7e14; } .dot--settings{ background:#6f42c1; }
+    .main{ margin-left:250px; padding:20px; padding-top:80px; }
+    @media (max-width: 992px){
+      .sidebar{ width:80px; padding-top:70px; }
+      .sidebar .nav-link span{ display:none; }
+      .sidebar .nav-link i{ margin-right:0; font-size:1.2rem; }
+      .navbar{ padding-left:80px; }
+      .main{ margin-left:80px; }
+    }
+    @media (max-width: 768px){
+      .sidebar{ transform: translateX(-100%); width:250px; }
+      .sidebar.show{ transform: translateX(0); }
+      .navbar{ padding-left:15px; }
+      .main{ margin-left:0; }
+      .navbar-toggler{ display:block; }
+    }
+    .navbar-toggler{ display:none; border:none; font-size:1.25rem; }
+    .navbar-toggler:focus{ box-shadow:none; }
+
+    /* 卡片与表格 */
+    .dashboard-card{ background:var(--white); border:none; border-radius:10px; box-shadow:0 4px 6px rgba(0,0,0,.04); }
+    .card-header{ background:var(--white); border-bottom:1px solid var(--border); font-weight:600; padding:1rem 1.25rem; }
+    .card-body{ padding:1rem 1.25rem; }
+    .table-sm td,.table-sm th{ padding:.5rem .5rem; vertical-align:middle; }
+    .text-mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    .btn{ border-radius:6px; font-weight:500; }
+
+    /* 状态徽章颜色（仅视觉展示） */
+    .badge-pending{ background:#adb5bd; }
+    .badge-review{ background:#6c757d; }
+    .badge-approved{ background:#16a34a; }
+    .badge-rejected{ background:#e03131; }
+    .badge-objection{ background:#f59f00; }
+    .badge-processing{ background:#0ca4ff; }
+
+    /* 缩略图网格（详情抽屉-提交内容） */
+    .thumb{ border:1px solid var(--border); border-radius:8px; overflow:hidden; background:#fafafa; }
+    .thumb img{ width:100%; height:140px; object-fit:cover; display:block; }
+    .file-pill{ border:1px dashed var(--border); padding:.4rem .6rem; border-radius:8px; display:inline-flex; align-items:center; gap:.5rem; margin:.25rem .4rem .25rem 0; }
+
+    /* 小型提示文本 */
+    .hint{ font-size:.85rem; color:#6c757d; }
+  
+/* ===== 列表不换行 + 舒适列宽（中文注释） ===== */
+.table td, .table th { white-space: nowrap; }
+
+@media (min-width: 992px){
+  th[col-w="submitId"]{ width: 150px; }
+  th[col-w="taskId"]{ width: 140px; }
+  th[col-w="category"]{ width: 220px; }
+  th[col-w="user"]{ width: 260px; }
+  th[col-w="submitAt"]{ width: 190px; }
+  th[col-w="status"]{ width: 120px; }
+  th[col-w="auto"]{ width: 200px; }
+  th[col-w="ops"]{ width: 120px; }
+}
+
+
+/* ===== 详情抽屉宽度统一用变量控制（中文注释） =====
+ * 说明：此前使用 .offcanvas-end{width:...} 在 95~98vw 下变化不明显（例如 960px 视口下仅增加 ~28px）。
+ * 现改为覆盖 Bootstrap 变量，使桌面端更明显，窄屏直接占满宽度。
+ */
+.offcanvas{ --bs-offcanvas-width: clamp(630px, 66vw, 885px); }
+@media (max-width: 1200px){ .offcanvas{ --bs-offcanvas-width: 68vw; } }
+
+.offcanvas-body{ padding-left: 1rem; padding-right: 1rem; }
+/* 收窄说明（中文-二次）：在上一版基础上再缩小 1/4 -> clamp(630px, 66vw, 885px)；<=1200px 视口为 68vw。 */
+</style>
+<link rel="stylesheet" href="p1-unify.css"/>
+<link rel="stylesheet" href="p2-unify.css"/>
+</head>
+<body>
+  <!-- 顶部导航（与接单平台一致：铃铛+用户下拉） -->
+  <nav class="navbar navbar-expand-lg navbar-light">
+    <div class="container-fluid">
+      <button id="sidebarToggle" class="navbar-toggler" type="button"><span class="navbar-toggler-icon"></span></button>
+      <a class="navbar-brand" href="doer-team-analytics-dashboard.html">
+        <strong><i class="bi bi-lightning-charge me-2"></i>任务接单管理平台</strong>
+      </a>
+      <div class="collapse navbar-collapse">
+        <ul class="navbar-nav ms-auto me-4">
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" id="notifDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false" href="#">
+              <i class="bi bi-bell"></i><span class="badge bg-danger ms-1">3</span>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="#"><i class="bi bi-journal-text me-2"></i>有 2 条提交待处理</a></li>
+              <li><a class="dropdown-item" href="#"><i class="bi bi-check2-circle me-2"></i>DT7002 已系统确认</a></li>
+              <li><hr class="dropdown-divider"/></li>
+              <li><a class="dropdown-item" href="#" id="viewAllNotificationsDashboard"><i class="bi bi-list-ul me-2"></i>查看所有通知</a></li>
+            </ul>
+          </li>
+          <li class="nav-item dropdown ms-2">
+            <a class="nav-link dropdown-toggle d-flex align-items-center" data-bs-toggle="dropdown" href="#" role="button">
+              <i class="bi bi-person-circle me-2"></i> 接单管理员
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="doer-team-account-management.html"><i class="bi bi-person-gear me-2"></i>账号与安全</a></li>
+              <li><hr class="dropdown-divider"/></li>
+              <li><a class="dropdown-item" href="#"><i class="bi bi-box-arrow-right me-2"></i>退出</a></li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 侧边栏（与仪表盘一致；当前页高亮） -->
+  <aside class="sidebar">
+    <ul class="nav flex-column">
+      <li class="nav-section"><span class="dot dot--platform"></span><span>平台</span></li>
+      <li><a class="nav-link" href="doer-team-analytics-dashboard.html"><i class="bi bi-speedometer2 me-2"></i><span>平台总仪表盘</span></a></li>
+      <li><a class="nav-link" href="doer-team-finance-platform-fund-flow.html"><i class="bi bi-cash-coin me-2"></i><span>平台资金流水</span></a></li>
+
+      <li class="nav-section"><span class="dot dot--task"></span><span>任务</span></li>
+      <li><a class="nav-link" href="doer-team-orders-situation.html"><i class="bi bi-cart-check me-2"></i><span>任务接单情况</span></a></li>
+      <li><a class="nav-link active" href="doer-team-tasks-completion.html"><i class="bi bi-check2-circle me-2"></i><span>任务完成情况</span></a></li>
+      <li><a class="nav-link" href="doer-team-tasks-list.html"><i class="bi bi-list-task me-2"></i><span>可接任务列表</span></a></li>
+
+      <li class="nav-section"><span class="dot dot--user"></span><span>用户</span></li>
+      <li><a class="nav-link" href="doer-team-users-list.html"><i class="bi bi-people me-2"></i><span>平台用户列表</span></a></li>
+      <li><a class="nav-link" href="doer-team-finance-withdrawal-list.html"><i class="bi bi-bank me-2"></i><span>用户提现列表</span></a></li>
+      <li><a class="nav-link" href="doer-team-finance-user-fund-flow.html"><i class="bi bi-journal-text me-2"></i><span>用户资金流水</span></a></li>
+
+      <li class="nav-section"><span class="dot dot--settings"></span><span>设置</span></li>
+      <li><a class="nav-link" href="doer-team-settings-categories.html"><i class="bi bi-sliders me-2"></i><span>业务分类概览</span></a></li>
+      <li><a class="nav-link" href="doer-team-system-api-monitoring.html"><i class="bi bi-activity me-2"></i><span>接口管理监控</span></a></li>
+      <li><a class="nav-link" href="doer-team-finance-payment-account.html"><i class="bi bi-credit-card me-2"></i><span>支付账户设置</span></a></li>
+      <li><a class="nav-link" href="doer-team-account-management.html"><i class="bi bi-person-gear me-2"></i><span>账号管理设置</span></a></li>
+      <li><a class="nav-link" href="doer-team-team-profile.html"><i class="bi bi-building-gear me-2"></i><span>团队资料设置</span></a></li>
+    </ul>
+  </aside>
+
+  <!-- 主内容 -->
+  <main class="main">
+    <!-- 顶部范围按钮（便于快速筛时间） -->
+    <div class="row g-2 align-items-center mb-3">
+      <div class="col-auto">
+        <div id="topRange" class="btn-group btn-group-sm">
+          <button class="btn btn-outline-primary" data-range="d1" type="button">昨日</button>
+          <button class="btn btn-outline-primary" data-range="d7" type="button">七日</button>
+          <button class="btn btn-outline-primary active" data-range="d30" type="button">近30日</button>
+          <button class="btn btn-outline-primary" data-range="y1" type="button">近一年</button>
+          <button class="btn btn-outline-secondary" data-range="total" type="button">累计</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 筛选表单（按用户+任务维度） -->
+    <div class="card p-3 mb-3 dashboard-card">
+      <form id="filterForm" class="row g-3 align-items-end">
+        <div class="col-md-3">
+          <label class="form-label small text-muted">接单用户关键词</label>
+          <input id="fUser" type="text" class="form-control form-control-sm" placeholder="如：接单用户A / 138****8899"/>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small text-muted">任务ID</label>
+          <input id="fTask" type="text" class="form-control form-control-sm" placeholder="如：DT7001"/>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small text-muted">任务分类</label>
+          <select id="fCate" class="form-select form-select-sm"><option value="">全部</option></select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small text-muted">审核状态</label>
+          <select id="fStatus" class="form-select form-select-sm">
+            <option value="">全部</option>
+            <option>待审核</option>
+            <option>异议中</option>
+            <option>处理中</option>
+            <option>已通过</option>
+            <option>已驳回</option>
+            <option>系统确认</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small text-muted">提交时间范围</label>
+          <div class="d-flex gap-2">
+            <input id="fStart" type="date" class="form-control form-control-sm"/>
+            <input id="fEnd" type="date" class="form-control form-control-sm"/>
+          </div>
+        </div>
+        <div class="col-12 d-flex gap-2">
+          <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-filter"></i> 筛选</button>
+          <button id="btnReset" type="button" class="btn btn-outline-secondary btn-sm">重置</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- 列表（以用户×任务为单位） -->
+    <div class="dashboard-card card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <div>
+          <span>任务完成情况（以用户为单位）</span>
+          <span class="text-muted small ms-2">共 <span id="totalRows">0</span> 条</span>
+          <div class="small text-muted mt-1">口径说明：每条记录 = 某用户对某任务的一次提交审核；同一用户完成多个任务将显示多行。</div>
+        </div>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm table-hover mb-0">
+            <thead class="table-light">
+  <tr>
+    <th col-w="submitId">提交ID</th>
+    <th col-w="taskId">任务ID</th>
+    <th col-w="category">任务分类</th>
+    <th col-w="user">接单用户</th>
+    <th col-w="submitAt">提交时间</th>
+    <th col-w="status">审核状态</th>
+    <th col-w="auto">自动确认剩余</th>
+    <th col-w="ops">操作</th>
+  </tr>
+</thead>
+            <tbody id="tbodyRows"></tbody>
+          </table>
+        </div>
+        <div class="d-flex justify-content-between align-items-center p-2">
+          <div class="small text-muted">当前第 <span id="pageNo">1</span> / <span id="pageTotal">1</span> 页</div>
+          <nav><ul id="pager" class="pagination pagination-sm mb-0"></ul></nav>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- 右侧详情抽屉（Offcanvas） -->
+  <div class="offcanvas offcanvas-end" tabindex="-1" id="ocDetail" aria-labelledby="ocDetailLabel">
+    <div class="offcanvas-header">
+      <h5 class="offcanvas-title" id="ocDetailLabel">提交详情</h5>
+      <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="关闭"></button>
+    </div>
+    <div class="offcanvas-body">
+      <!-- 抽屉内头部关键信息 -->
+      <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+        <span id="dTask" class="badge bg-light text-dark text-mono">任务ID: —</span>
+        <span id="dCate" class="badge bg-light text-dark">分类: —</span>
+        <span id="dUser" class="badge bg-light text-dark">用户: —</span>
+        <span id="dStatus" class="badge">—</span>
+      </div>
+      <!-- 标签页：概览 / 提交内容 / 审核记录 -->
+      <ul class="nav nav-tabs" id="detailTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active" id="tab-overview" data-bs-toggle="tab" data-bs-target="#pane-overview" type="button" role="tab">概览</button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="tab-content" data-bs-toggle="tab" data-bs-target="#pane-content" type="button" role="tab">提交内容</button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="tab-audit" data-bs-toggle="tab" data-bs-target="#pane-audit" type="button" role="tab">审核记录</button>
+        </li>
+      </ul>
+      <div class="tab-content pt-3">
+        <!-- 概览面板 -->
+        <div class="tab-pane fade show active" id="pane-overview" role="tabpanel">
+          <div class="row g-3">
+            <div class="col-6">
+              <div class="small text-muted">提交ID</div>
+              <div id="ovSubmitId" class="fw-semibold text-mono">—</div>
+            </div>
+            <div class="col-6">
+              <div class="small text-muted">提交时间</div>
+              <div id="ovSubmitAt" class="fw-semibold">—</div>
+            </div>
+            <div class="col-6">
+              <div class="small text-muted">自动确认</div>
+              <div id="ovAuto" class="fw-semibold">—</div>
+              <div class="hint">系统达到时限后自动确认（仅展示，用于了解进度）。</div>
+            </div>
+            <div class="col-6">
+              <div class="small text-muted">当前审核状态</div>
+              <div id="ovStatus" class="fw-semibold">—</div>
+            </div>
+            <div class="col-12">
+              <div class="small text-muted">审核结果 / 理由</div>
+              <div id="ovResult" class="fw-semibold">—</div>
+            </div>
+          </div>
+        </div>
+        <!-- 提交内容面板（截图/凭证） -->
+        <div class="tab-pane fade" id="pane-content" role="tabpanel">
+          <div class="row g-3" id="contentGrid">
+            <!-- 动态填充缩略图与文件列表 -->
+          </div>
+        </div>
+        <!-- 审核记录时间线 -->
+        <div class="tab-pane fade" id="pane-audit" role="tabpanel">
+          <ul id="auditTimeline" class="list-group list-group-flush">
+            <!-- 动态填充审核记录 -->
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 查看全部通知模态 -->
+  <div class="modal fade" id="modalAllNotifications" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">全部通知</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+        </div>
+        <div class="modal-body">
+          <ul class="list-group">
+            <li class="list-group-item d-flex justify-content-between align-items-start">
+              <div class="ms-2 me-auto">
+                <div class="fw-normal">有 2 条提交待处理。</div>
+                <small class="text-muted">4 分钟前</small>
+              </div>
+            </li>
+            <li class="list-group-item d-flex justify-content-between align-items-start">
+              <div class="ms-2 me-auto">
+                <div class="fw-normal">DT7002 已系统确认。</div>
+                <small class="text-muted">25 分钟前</small>
+              </div>
+            </li>
+            <li class="list-group-item d-flex justify-content-between align-items-start">
+              <div class="ms-2 me-auto">
+                <div class="fw-normal">DT7005 上传了 3 张新截图。</div>
+                <small class="text-muted">昨天 09:10</small>
+              </div>
+            </li>
+          </ul>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 依赖脚本 -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // ============================ 工具函数（中文注释） ============================
+    // 金额显示（当前页面未直接展示金额，保留工具函数以便后续扩展）
+    function fmtMoney(n){
+      var sign = n < 0 ? '-' : '';
+      var v = Math.abs(n).toLocaleString('zh-CN',{ minimumFractionDigits:2, maximumFractionDigits:2 });
+      return sign + '¥ ' + v;
+    }
+    // 格式化日期时间
+    function fmtDT(s){ if(!s) return '—'; var d=new Date(s); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0'); }
+    // 计算剩余时间文本
+    function leftText(deadline){
+      if(!deadline) return '—';
+      var now=new Date(), end=new Date(deadline), diff=end-now;
+      if(diff<=0) return '已达时限';
+      var h=Math.floor(diff/3600000), m=Math.floor((diff%3600000)/60000);
+      return h+' 小时 '+m+' 分';
+    }
+    // 徽章样式映射
+    function statusBadgeClass(s){
+      if(s==='待审核') return 'badge-pending';
+      if(s==='异议中') return 'badge-objection';
+      if(s==='处理中') return 'badge-processing';
+      if(s==='已通过') return 'badge-approved';
+      if(s==='已驳回') return 'badge-rejected';
+      if(s==='系统确认') return 'badge-approved';
+      return 'badge-pending';
+    }
+
+    // ============================ 模拟数据（以用户×任务为单位） ============================
+    // 说明：每条记录代表同一“用户”对某一“任务”的一次提交审核；
+    // images 为完成截图，files 为完成凭证（如PDF/ZIP），fields 为补充文本内容。
+    var SUBMISSIONS=[
+      {
+        submitId:'SC-90001', taskId:'DT7001', category:'短视频点赞', userId:'U1001', userName:'接单用户A',
+        submitAt:'2025-09-15T21:18:06', status:'待审核', autoConfirmAt:'2025-09-17T21:18:06',
+        images:[
+          {src:'https://picsum.photos/seed/dt7001a/600/380', name:'截图1'},
+          {src:'https://picsum.photos/seed/dt7001b/600/380', name:'截图2'}
+        ],
+        files:[
+          {name:'完成凭证.pdf', url:'#'},
+          {name:'操作记录.zip', url:'#'}
+        ],
+        fields:[
+          {label:'完成描述', value:'已按要求完成点赞与关注，共 20 次操作'},
+          {label:'执行步骤', value:'打开APP→搜索关键词→进入作者主页→点赞→记录'}
+        ],
+        audits:[
+          {ts:'2025-09-15T21:18:06', action:'提交', note:'用户提交了 2 张截图与 2 个附件'},
+          {ts:'2025-09-16T09:10:00', action:'平台查看', note:'值班人员打开查看'}
+        ]
+      },
+      {
+        submitId:'SC-90002', taskId:'DT7002', category:'电商好评', userId:'U1001', userName:'接单用户A',
+        submitAt:'2025-09-12T09:06:32', status:'系统确认', autoConfirmAt:'2025-09-14T09:06:32',
+        images:[
+          {src:'https://picsum.photos/seed/dt7002a/600/380', name:'订单页截图'},
+          {src:'https://picsum.photos/seed/dt7002b/600/380', name:'评价页截图'}
+        ],
+        files:[ {name:'下单记录.jpg', url:'#'} ],
+        fields:[ {label:'完成描述', value:'已下单并按要求五星好评'} ],
+        audits:[
+          {ts:'2025-09-12T09:06:32', action:'提交', note:'含 2 张截图'},
+          {ts:'2025-09-14T09:06:33', action:'系统确认', note:'达到自动确认时限'}
+        ]
+      },
+      {
+        submitId:'SC-90003', taskId:'DT7003', category:'APP注册', userId:'U1002', userName:'接单用户B',
+        submitAt:'2025-09-14T14:20:11', status:'已通过', autoConfirmAt:'2025-09-16T14:20:11',
+        images:[ {src:'https://picsum.photos/seed/dt7003/600/380', name:'注册成功截图'} ],
+        files:[ {name:'注册记录.csv', url:'#'} ],
+        fields:[ {label:'完成描述', value:'完成 1 次注册并完善资料'} ],
+        audits:[
+          {ts:'2025-09-14T14:20:11', action:'提交', note:'1 张截图'},
+          {ts:'2025-09-14T20:05:00', action:'平台审核通过', note:'字段符合，截图清晰'}
+        ]
+      },
+      {
+        submitId:'SC-90004', taskId:'DT7004', category:'关注+转发', userId:'U1003', userName:'接单用户C',
+        submitAt:'2025-09-13T19:02:46', status:'已驳回', autoConfirmAt:'2025-09-15T19:02:46',
+        images:[ {src:'https://picsum.photos/seed/dt7004/600/380', name:'转发记录截图'} ],
+        files:[],
+        fields:[
+          {label:'完成描述', value:'完成关注，但因网络问题未截图转发'},
+          {label:'补充说明', value:'次日可补交截图'}
+        ],
+        audits:[
+          {ts:'2025-09-13T19:02:46', action:'提交', note:'缺少关键截图'},
+          {ts:'2025-09-13T22:11:00', action:'平台驳回', note:'未按标准上传转发截图'}
+        ]
+      },
+      {
+        submitId:'SC-90005', taskId:'DT7005', category:'门店打卡', userId:'U1004', userName:'接单用户D',
+        submitAt:'2025-09-10T10:16:20', status:'异议中', autoConfirmAt:'2025-09-12T10:16:20',
+        images:[
+          {src:'https://picsum.photos/seed/dt7005a/600/380', name:'店外照片'},
+          {src:'https://picsum.photos/seed/dt7005b/600/380', name:'店内照片'},
+          {src:'https://picsum.photos/seed/dt7005c/600/380', name:'收银台照片'}
+        ],
+        files:[ {name:'定位信息.txt', url:'#'} ],
+        fields:[ {label:'完成描述', value:'到店完成三项拍摄，GPS 已开启'} ],
+        audits:[
+          {ts:'2025-09-10T10:16:20', action:'提交', note:'3 张照片'},
+          {ts:'2025-09-10T18:30:00', action:'用户申诉', note:'认为驳回理由不充分'}
+        ]
+      },
+      {
+        submitId:'SC-90006', taskId:'DT7006', category:'问卷填写', userId:'U1004', userName:'接单用户D',
+        submitAt:'2025-09-15T08:45:00', status:'处理中', autoConfirmAt:'2025-09-17T08:45:00',
+        images:[],
+        files:[ {name:'问卷导出.pdf', url:'#'} ],
+        fields:[ {label:'完成描述', value:'已完整填写 30 题问卷'} ],
+        audits:[
+          {ts:'2025-09-15T08:45:00', action:'提交', note:'含 1 个附件'},
+          {ts:'2025-09-15T12:00:00', action:'平台处理中', note:'人工核查问卷有效性'}
+        ]
+      },
+      {
+  submitId:'SC-90100', taskId:'DT7100', category:'电商好评', userId:'U1001', userName:'接单用户A',
+  submitAt:'2025-08-25T03:45:00', status:'异议中', autoConfirmAt:'2025-08-26T03:45:00',
+  images:[],
+  files:[{name:'注册记录.csv', url:'#'}, {name:'完成凭证.pdf', url:'#'}],
+  fields:[{label:'完成描述', value:'示例说明：已按要求完成操作，详见截图与附件'}],
+  audits:[{ts:'2025-08-25T03:45:00', action:'提交', note:'自动化模拟数据'}, {ts:'2025-08-25T09:45:00', action:'用户申诉', note:'记录更新'}]
+},
+      {
+  submitId:'SC-90101', taskId:'DT7101', category:'直播间互动', userId:'U1001', userName:'接单用户A',
+  submitAt:'2025-09-17T09:47:00', status:'异议中', autoConfirmAt:'2025-09-20T09:47:00',
+  images:[],
+  files:[{name:'操作记录.zip', url:'#'}, {name:'注册记录.csv', url:'#'}],
+  fields:[{label:'完成描述', value:'示例说明：已按要求完成操作，详见截图与附件'}],
+  audits:[{ts:'2025-09-17T09:47:00', action:'提交', note:'自动化模拟数据'}, {ts:'2025-09-17T15:47:00', action:'用户申诉', note:'记录更新'}]
+},
+      {
+  submitId:'SC-90102', taskId:'DT7102', category:'直播间互动', userId:'U1004', userName:'接单用户D',
+  submitAt:'2025-09-02T17:43:00', status:'待审核', autoConfirmAt:'2025-09-03T17:43:00',
+  images:[{src:'https://picsum.photos/seed/dt7102_0/600/380', name:'截图1'}, {src:'https://picsum.photos/seed/dt7102_1/600/380', name:'截图2'}, {src:'https://picsum.photos/seed/dt7102_2/600/380', name:'截图3'}],
+  files:[{name:'下单记录.jpg', url:'#'}],
+  fields:[{label:'完成描述', value:'示例说明：已按要求完成操作，详见截图与附件'}],
+  audits:[{ts:'2025-09-02T17:43:00', action:'提交', note:'自动化模拟数据'}]
+},
+      {
+  submitId:'SC-90103', taskId:'DT7103', category:'APP注册', userId:'U1004', userName:'接单用户D',
+  submitAt:'2025-08-24T01:54:00', status:'待审核', autoConfirmAt:'2025-08-26T01:54:00',
+  images:[],
+  files:[{name:'下单记录.jpg', url:'#'}],
+  fields:[{label:'完成描述', value:'示例说明：已按要求完成操作，详见截图与附件'}],
+  audits:[{ts:'2025-08-24T01:54:00', action:'提交', note:'自动化模拟数据'}]
+},
+      {
+  submitId:'SC-90104', taskId:'DT7104', category:'门店打卡', userId:'U1001', userName:'接单用户A',
+  submitAt:'2025-08-24T21:26:00', status:'待审核', autoConfirmAt:'2025-08-26T21:26:00',
+  images:[],
+  files:[{name:'下单记录.jpg', url:'#'}, {name:'注册记录.csv', url:'#'}],
+  fields:[{label:'完成描述', value:'示例说明：已按要求完成操作，详见截图与附件'}],
+  audits:[{ts:'2025-08-24T21:26:00', action:'提交', note:'自动化模拟数据'}]
+},
+      {
+  submitId:'SC-90105', taskId:'DT7105', category:'问卷填写', userId:'U1004', userName:'接单用户D',
+  submitAt:'2025-08-26T09:58:00', status:'系统确认', autoConfirmAt:'2025-08-27T09:58:00',
+  images:[{src:'https://picsum.photos/seed/dt7105_0/600/380', name:'截图1'}, {src:'https://picsum.photos/seed/dt7105_1/600/380', name:'截图2'}],
+  files:[],
+  fields:[{label:'完成描述', value:'示例说明：已按要求完成操作，详见截图与附件'}],
+  audits:[{ts:'2025-08-26T09:58:00', action:'提交', note:'自动化模拟数据'}, {ts:'2025-08-26T15:58:00', action:'系统确认', note:'记录更新'}]
+},
+      {
+  submitId:'SC-90106', taskId:'DT7106', category:'关注+转发', userId:'U1002', userName:'接单用户B',
+  submitAt:'2025-09-05T03:31:00', status:'系统确认', autoConfirmAt:'2025-09-07T03:31:00',
+  images:[{src:'https://picsum.photos/seed/dt7106_0/600/380', name:'截图1'}],
+  files:[{name:'下单记录.jpg', url:'#'}],
+  fields:[{label:'完成描述', value:'示例说明：已按要求完成操作，详见截图与附件'}],
+  audits:[{ts:'2025-09-05T03:31:00', action:'提交', note:'自动化模拟数据'}, {ts:'2025-09-05T09:31:00', action:'系统确认', note:'记录更新'}]
+},
+      {
+  submitId:'SC-90107', taskId:'DT7107', category:'关注+转发', userId:'U1005', userName:'接单用户E',
+  submitAt:'2025-08-25T14:19:00', status:'待审核', autoConfirmAt:'2025-08-28T14:19:00',
+  images:[{src:'https://picsum.photos/seed/dt7107_0/600/380', name:'截图1'}],
+  files:[{name:'操作记录.zip', url:'#'}, {name:'操作记录.zip', url:'#'}],
+  fields:[{label:'完成描述', value:'示例说明：已按要求完成操作，详见截图与附件'}],
+  audits:[{ts:'2025-08-25T14:19:00', action:'提交', note:'自动化模拟数据'}]
+},
+      {
+  submitId:'SC-90108', taskId:'DT7108', category:'内容收藏', userId:'U1007', userName:'接单用户G',
+  submitAt:'2025-09-08T15:16:00', status:'已驳回', autoConfirmAt:'2025-09-09T15:16:00',
+  images:[{src:'https://picsum.photos/seed/dt7108_0/600/380', name:'截图1'}, {src:'https://picsum.photos/seed/dt7108_1/600/380', name:'截图2'}],
+  files:[],
+  fields:[{label:'完成描述', value:'示例说明：已按要求完成操作，详见截图与附件'}],
+  audits:[{ts:'2025-09-08T15:16:00', action:'提交', note:'自动化模拟数据'}, {ts:'2025-09-08T21:16:00', action:'平台驳回', note:'记录更新'}]
+},
+      {
+  submitId:'SC-90109', taskId:'DT7109', category:'关注+转发', userId:'U1001', userName:'接单用户A',
+  submitAt:'2025-08-23T01:35:00', status:'处理中', autoConfirmAt:'2025-08-24T01:35:00',
+  images:[{src:'https://picsum.photos/seed/dt7109_0/600/380', name:'截图1'}],
+  files:[{name:'下单记录.jpg', url:'#'}, {name:'操作记录.zip', url:'#'}],
+  fields:[{label:'完成描述', value:'示例说明：已按要求完成操作，详见截图与附件'}],
+  audits:[{ts:'2025-08-23T01:35:00', action:'提交', note:'自动化模拟数据'}, {ts:'2025-08-23T07:35:00', action:'平台处理中', note:'记录更新'}]
+},
+      {
+  submitId:'SC-90110', taskId:'DT7110', category:'内容收藏', userId:'U1007', userName:'接单用户G',
+  submitAt:'2025-08-19T15:31:00', status:'异议中', autoConfirmAt:'2025-08-21T15:31:00',
+  images:[{src:'https://picsum.photos/seed/dt7110_0/600/380', name:'截图1'}],
+  files:[],
+  fields:[{label:'完成描述', value:'示例说明：已按要求完成操作，详见截图与附件'}],
+  audits:[{ts:'2025-08-19T15:31:00', action:'提交', note:'自动化模拟数据'}, {ts:'2025-08-19T21:31:00', action:'用户申诉', note:'记录更新'}]
+},
+      {
+  submitId:'SC-90111', taskId:'DT7111', category:'门店打卡', userId:'U1007', userName:'接单用户G',
+  submitAt:'2025-08-19T17:35:00', status:'处理中', autoConfirmAt:'2025-08-20T17:35:00',
+  images:[{src:'https://picsum.photos/seed/dt7111_0/600/380', name:'截图1'}],
+  files:[{name:'问卷导出.pdf', url:'#'}, {name:'完成凭证.pdf', url:'#'}],
+  fields:[{label:'完成描述', value:'示例说明：已按要求完成操作，详见截图与附件'}],
+  audits:[{ts:'2025-08-19T17:35:00', action:'提交', note:'自动化模拟数据'}, {ts:'2025-08-19T23:35:00', action:'平台处理中', note:'记录更新'}]
+},
+      {
+  submitId:'SC-90112', taskId:'DT7112', category:'短视频点赞', userId:'U1002', userName:'接单用户B',
+  submitAt:'2025-09-12T15:50:00', status:'系统确认', autoConfirmAt:'2025-09-14T15:50:00',
+  images:[],
+  files:[{name:'问卷导出.pdf', url:'#'}],
+  fields:[{label:'完成描述', value:'示例说明：已按要求完成操作，详见截图与附件'}],
+  audits:[{ts:'2025-09-12T15:50:00', action:'提交', note:'自动化模拟数据'}, {ts:'2025-09-12T21:50:00', action:'系统确认', note:'记录更新'}]
+},
+      {
+  submitId:'SC-90113', taskId:'DT7113', category:'内容收藏', userId:'U1005', userName:'接单用户E',
+  submitAt:'2025-08-31T11:17:00', status:'系统确认', autoConfirmAt:'2025-09-01T11:17:00',
+  images:[{src:'https://picsum.photos/seed/dt7113_0/600/380', name:'截图1'}, {src:'https://picsum.photos/seed/dt7113_1/600/380', name:'截图2'}],
+  files:[{name:'下单记录.jpg', url:'#'}, {name:'完成凭证.pdf', url:'#'}],
+  fields:[{label:'完成描述', value:'示例说明：已按要求完成操作，详见截图与附件'}],
+  audits:[{ts:'2025-08-31T11:17:00', action:'提交', note:'自动化模拟数据'}, {ts:'2025-08-31T17:17:00', action:'系统确认', note:'记录更新'}]
+},
+      {
+  submitId:'SC-90114', taskId:'DT7114', category:'门店打卡', userId:'U1007', userName:'接单用户G',
+  submitAt:'2025-09-11T22:00:00', status:'系统确认', autoConfirmAt:'2025-09-14T22:00:00',
+  images:[{src:'https://picsum.photos/seed/dt7114_0/600/380', name:'截图1'}, {src:'https://picsum.photos/seed/dt7114_1/600/380', name:'截图2'}],
+  files:[{name:'操作记录.zip', url:'#'}, {name:'注册记录.csv', url:'#'}],
+  fields:[{label:'完成描述', value:'示例说明：已按要求完成操作，详见截图与附件'}],
+  audits:[{ts:'2025-09-11T22:00:00', action:'提交', note:'自动化模拟数据'}, {ts:'2025-09-12T04:00:00', action:'系统确认', note:'记录更新'}]
+},
+      {
+  submitId:'SC-90115', taskId:'DT7115', category:'电商好评', userId:'U1005', userName:'接单用户E',
+  submitAt:'2025-08-21T15:28:00', status:'已驳回', autoConfirmAt:'2025-08-22T15:28:00',
+  images:[{src:'https://picsum.photos/seed/dt7115_0/600/380', name:'截图1'}],
+  files:[{name:'操作记录.zip', url:'#'}],
+  fields:[{label:'完成描述', value:'示例说明：已按要求完成操作，详见截图与附件'}],
+  audits:[{ts:'2025-08-21T15:28:00', action:'提交', note:'自动化模拟数据'}, {ts:'2025-08-21T21:28:00', action:'平台驳回', note:'记录更新'}]
+},
+      {
+  submitId:'SC-90116', taskId:'DT7116', category:'短视频点赞', userId:'U1006', userName:'接单用户F',
+  submitAt:'2025-09-02T11:53:00', status:'处理中', autoConfirmAt:'2025-09-04T11:53:00',
+  images:[{src:'https://picsum.photos/seed/dt7116_0/600/380', name:'截图1'}],
+  files:[],
+  fields:[{label:'完成描述', value:'示例说明：已按要求完成操作，详见截图与附件'}],
+  audits:[{ts:'2025-09-02T11:53:00', action:'提交', note:'自动化模拟数据'}, {ts:'2025-09-02T17:53:00', action:'平台处理中', note:'记录更新'}]
+},
+      {
+  submitId:'SC-90117', taskId:'DT7117', category:'关注+转发', userId:'U1002', userName:'接单用户B',
+  submitAt:'2025-09-14T12:29:00', status:'待审核', autoConfirmAt:'2025-09-17T12:29:00',
+  images:[{src:'https://picsum.photos/seed/dt7117_0/600/380', name:'截图1'}],
+  files:[],
+  fields:[{label:'完成描述', value:'示例说明：已按要求完成操作，详见截图与附件'}],
+  audits:[{ts:'2025-09-14T12:29:00', action:'提交', note:'自动化模拟数据'}]
+},
+      {
+  submitId:'SC-90118', taskId:'DT7118', category:'内容收藏', userId:'U1003', userName:'接单用户C',
+  submitAt:'2025-09-08T19:05:00', status:'已驳回', autoConfirmAt:'2025-09-10T19:05:00',
+  images:[{src:'https://picsum.photos/seed/dt7118_0/600/380', name:'截图1'}],
+  files:[{name:'操作记录.zip', url:'#'}, {name:'下单记录.jpg', url:'#'}],
+  fields:[{label:'完成描述', value:'示例说明：已按要求完成操作，详见截图与附件'}],
+  audits:[{ts:'2025-09-08T19:05:00', action:'提交', note:'自动化模拟数据'}, {ts:'2025-09-09T01:05:00', action:'平台驳回', note:'记录更新'}]
+},
+      {
+  submitId:'SC-90119', taskId:'DT7119', category:'直播间互动', userId:'U1006', userName:'接单用户F',
+  submitAt:'2025-09-02T19:32:00', status:'待审核', autoConfirmAt:'2025-09-03T19:32:00',
+  images:[{src:'https://picsum.photos/seed/dt7119_0/600/380', name:'截图1'}],
+  files:[],
+  fields:[{label:'完成描述', value:'示例说明：已按要求完成操作，详见截图与附件'}],
+  audits:[{ts:'2025-09-02T19:32:00', action:'提交', note:'自动化模拟数据'}]
+},
+      {
+  submitId:'SC-90120', taskId:'DT7120', category:'问卷填写', userId:'U1001', userName:'接单用户A',
+  submitAt:'2025-08-29T18:46:00', status:'已驳回', autoConfirmAt:'2025-08-30T18:46:00',
+  images:[],
+  files:[],
+  fields:[{label:'完成描述', value:'示例说明：已按要求完成操作，详见截图与附件'}],
+  audits:[{ts:'2025-08-29T18:46:00', action:'提交', note:'自动化模拟数据'}, {ts:'2025-08-30T00:46:00', action:'平台驳回', note:'记录更新'}]
+},
+      {
+  submitId:'SC-90121', taskId:'DT7121', category:'短视频点赞', userId:'U1004', userName:'接单用户D',
+  submitAt:'2025-09-15T10:05:00', status:'处理中', autoConfirmAt:'2025-09-16T10:05:00',
+  images:[{src:'https://picsum.photos/seed/dt7121_0/600/380', name:'截图1'}],
+  files:[{name:'问卷导出.pdf', url:'#'}],
+  fields:[{label:'完成描述', value:'示例说明：已按要求完成操作，详见截图与附件'}],
+  audits:[{ts:'2025-09-15T10:05:00', action:'提交', note:'自动化模拟数据'}, {ts:'2025-09-15T16:05:00', action:'平台处理中', note:'记录更新'}]
+},
+      {
+  submitId:'SC-90122', taskId:'DT7122', category:'关注+转发', userId:'U1003', userName:'接单用户C',
+  submitAt:'2025-08-24T17:24:00', status:'已通过', autoConfirmAt:'2025-08-25T17:24:00',
+  images:[{src:'https://picsum.photos/seed/dt7122_0/600/380', name:'截图1'}, {src:'https://picsum.photos/seed/dt7122_1/600/380', name:'截图2'}, {src:'https://picsum.photos/seed/dt7122_2/600/380', name:'截图3'}],
+  files:[{name:'操作记录.zip', url:'#'}],
+  fields:[{label:'完成描述', value:'示例说明：已按要求完成操作，详见截图与附件'}],
+  audits:[{ts:'2025-08-24T17:24:00', action:'提交', note:'自动化模拟数据'}, {ts:'2025-08-24T23:24:00', action:'平台审核通过', note:'记录更新'}]
+},
+      {
+  submitId:'SC-90123', taskId:'DT7123', category:'电商好评', userId:'U1002', userName:'接单用户B',
+  submitAt:'2025-08-26T22:38:00', status:'已通过', autoConfirmAt:'2025-08-28T22:38:00',
+  images:[{src:'https://picsum.photos/seed/dt7123_0/600/380', name:'截图1'}, {src:'https://picsum.photos/seed/dt7123_1/600/380', name:'截图2'}, {src:'https://picsum.photos/seed/dt7123_2/600/380', name:'截图3'}],
+  files:[{name:'完成凭证.pdf', url:'#'}, {name:'完成凭证.pdf', url:'#'}],
+  fields:[{label:'完成描述', value:'示例说明：已按要求完成操作，详见截图与附件'}],
+  audits:[{ts:'2025-08-26T22:38:00', action:'提交', note:'自动化模拟数据'}, {ts:'2025-08-27T04:38:00', action:'平台审核通过', note:'记录更新'}]
+}
+    ];
+
+    // ============================ 页面状态与初始化 ============================
+    var state={ pageSize:12, page:1, range:'d30', rows:SUBMISSIONS, filtered:[] };
+
+    // 填充任务分类选项（来自模拟数据）
+    (function initCateOptions(){
+      var set={}, sel=document.getElementById('fCate');
+      for(var i=0;i<SUBMISSIONS.length;i++){ set[SUBMISSIONS[i].category]=1; }
+      Object.keys(set).forEach(function(k){ var o=document.createElement('option'); o.value=k; o.textContent=k; sel.appendChild(o); });
+    })();
+
+    // 顶部范围换算
+    function rangeDays(tag){ if(tag==='d1')return 1; if(tag==='d7')return 7; if(tag==='d30')return 30; if(tag==='y1')return 365; return null; }
+    function withinRange(ts, tag){
+      var days=rangeDays(tag); if(!days) return true;
+      var now=new Date(); var from=new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      var start=new Date(from.getTime()-(days-1)*86400000); var d=new Date(ts);
+      return d>=start && d<=now;
+    }
+
+    // 过滤与渲染主列表
+    function applyFilter(){
+      var kw=(document.getElementById('fUser').value||'').trim();
+      var task=(document.getElementById('fTask').value||'').trim();
+      var cate=document.getElementById('fCate').value;
+      var status=document.getElementById('fStatus').value;
+      var s=document.getElementById('fStart').value ? new Date(document.getElementById('fStart').value+'T00:00:00') : null;
+      var e=document.getElementById('fEnd').value ? new Date(document.getElementById('fEnd').value+'T23:59:59') : null;
+
+      state.filtered = state.rows.filter(function(r){
+        if(kw && !(r.userName.includes(kw) || r.userId.includes(kw))) return false;
+        if(task && !(r.taskId||'').includes(task)) return false;
+        if(cate && r.category!==cate) return false;
+        if(status && r.status!==status) return false;
+        var dt=new Date(r.submitAt);
+        if(s && dt<s) return false;
+        if(e && dt>e) return false;
+        if(!withinRange(r.submitAt, state.range)) return false;
+        return true;
+      }).sort(function(a,b){ return new Date(b.submitAt) - new Date(a.submitAt); });
+
+      renderTable();
+    }
+
+    function rowHTML(r){
+      var badge = '<span class="badge '+statusBadgeClass(r.status)+'">'+r.status+'</span>';
+      var left = r.autoConfirmAt ? leftText(r.autoConfirmAt) : '—';
+      return '<tr>'
+        + '<td class="text-mono">'+r.submitId+'</td>'
+        + '<td class="text-mono">'+r.taskId+'</td>'
+        + '<td>'+r.category+'</td>'
+        + '<td>'+r.userName+' <span class="text-muted small">('+r.userId+')</span></td>'
+        + '<td class="text-mono">'+fmtDT(r.submitAt)+'</td>'
+        + '<td>'+badge+'</td>'
+        + '<td>'+left+'</td>'
+        + '<td>'
+          + '<button class="btn btn-sm btn-primary" data-action="detail" data-id="'+r.submitId+'"><i class="bi bi-eye"></i> 详情</button>'
+        + '</td>'
+      + '</tr>';
+    }
+
+    function renderTable(){
+      var start=(state.page-1)*state.pageSize;
+      var pageRows=state.filtered.slice(start, start+state.pageSize);
+      var html='';
+      if(pageRows.length){ for(var i=0;i<pageRows.length;i++) html+=rowHTML(pageRows[i]); }
+      else{ html = '<tr><td colspan="8" class="text-center py-4 text-muted">暂无数据</td></tr>'; }
+      document.getElementById('tbodyRows').innerHTML = html;
+      document.getElementById('totalRows').textContent = state.filtered.length;
+
+      var totalPage=Math.max(1, Math.ceil(state.filtered.length/state.pageSize));
+      document.getElementById('pageNo').textContent = state.page;
+      document.getElementById('pageTotal').textContent = totalPage;
+
+      var items=[];
+      function li(disabled,active,label,page){ return '<li class="page-item '+(disabled?'disabled':'')+' '+(active?'active':'')+'"><a class="page-link" href="#" data-page="'+(page||'')+'">'+label+'</a></li>'; }
+      items.push(li(state.page<=1,false,'«',state.page-1));
+      for(var p=1;p<=totalPage;p++){
+        if(p===1||p===totalPage||Math.abs(p-state.page)<=1){ items.push(li(false,p===state.page,String(p),p)); }
+        else if(items[items.length-1] !== '...'){ items.push('<li class="page-item disabled"><span class="page-link">…</span></li>'); }
+      }
+      items.push(li(state.page>=totalPage,false,'»',state.page+1));
+      document.getElementById('pager').innerHTML = items.join('');
+    }
+
+    // 详情抽屉渲染（概览/提交内容/审核记录）
+    function openDetail(id){
+      var r=state.rows.find(function(x){ return x.submitId===id; });
+      if(!r) return;
+      // 顶部徽章与关键信息
+      document.getElementById('ocDetailLabel').textContent = '提交详情 · '+r.submitId;
+      document.getElementById('dTask').textContent = '任务ID: '+r.taskId;
+      document.getElementById('dCate').textContent = '分类: '+r.category;
+      document.getElementById('dUser').textContent = '用户: '+r.userName+'('+r.userId+')';
+      var ds=document.getElementById('dStatus'); ds.className='badge '+statusBadgeClass(r.status); ds.textContent=r.status;
+
+      // 概览内容
+      document.getElementById('ovSubmitId').textContent = r.submitId;
+      document.getElementById('ovSubmitAt').textContent = fmtDT(r.submitAt);
+      document.getElementById('ovAuto').textContent = r.autoConfirmAt ? (leftText(r.autoConfirmAt)+' · 截止 '+fmtDT(r.autoConfirmAt)) : '—';
+      document.getElementById('ovStatus').textContent = r.status;
+      // 简单推断审核结果
+      var result='—';
+      if(r.status==='已通过' || r.status==='系统确认') result='已通过（含系统确认）';
+      if(r.status==='已驳回') result='已驳回（可查看驳回原因）';
+      document.getElementById('ovResult').textContent = result;
+
+      // 提交内容（截图与附件、文本字段）
+      var grid=document.getElementById('contentGrid'); grid.innerHTML='';
+      if(r.images && r.images.length){
+        var imgTitle=document.createElement('div'); imgTitle.className='col-12'; imgTitle.innerHTML='<div class="fw-semibold mb-1">完成截图</div>';
+        grid.appendChild(imgTitle);
+        r.images.forEach(function(it){
+          var col=document.createElement('div'); col.className='col-6';
+          col.innerHTML='<div class="thumb"><img src="'+it.src+'" alt="'+(it.name||'截图')+'"/></div><div class="small text-muted mt-1">'+(it.name||'截图')+'</div>';
+          grid.appendChild(col);
+        });
+      }
+      if(r.files && r.files.length){
+        var fileTitle=document.createElement('div'); fileTitle.className='col-12'; fileTitle.innerHTML='<div class="fw-semibold mb-1">完成凭证</div>';
+        grid.appendChild(fileTitle);
+        var fileWrap=document.createElement('div'); fileWrap.className='col-12';
+        var inner='';
+        r.files.forEach(function(f){ inner+='<span class="file-pill"><i class="bi bi-paperclip"></i>'+f.name+'</span>'; });
+        fileWrap.innerHTML=inner; grid.appendChild(fileWrap);
+      }
+      if(r.fields && r.fields.length){
+        var fldTitle=document.createElement('div'); fldTitle.className='col-12'; fldTitle.innerHTML='<div class="fw-semibold mb-1">补充说明</div>';
+        grid.appendChild(fldTitle);
+        r.fields.forEach(function(f){
+          var col=document.createElement('div'); col.className='col-12';
+          col.innerHTML='<div class="small text-muted">'+f.label+'</div><div class="fw-semibold">'+f.value+'</div>';
+          grid.appendChild(col);
+        });
+      }
+      if(!grid.children.length){
+        var empty=document.createElement('div'); empty.className='col-12 text-muted'; empty.textContent='无提交内容';
+        grid.appendChild(empty);
+      }
+
+      // 审核记录时间线
+      var tl=document.getElementById('auditTimeline'); tl.innerHTML='';
+      (r.audits||[]).forEach(function(a){
+        var li=document.createElement('li'); li.className='list-group-item';
+        li.innerHTML='<div class="d-flex justify-content-between"><div><span class="fw-semibold">'+a.action+'</span> · <span class="text-muted">'+(a.note||'')+'</span></div><div class="text-mono">'+fmtDT(a.ts)+'</div></div>';
+        tl.appendChild(li);
+      });
+      if(!tl.children.length){
+        var li=document.createElement('li'); li.className='list-group-item text-muted'; li.textContent='暂无审核记录';
+        tl.appendChild(li);
+      }
+
+      // 打开抽屉
+      var ocEl=document.getElementById('ocDetail'); bootstrap.Offcanvas.getOrCreateInstance(ocEl).show();
+    }
+
+    // ============================ 事件绑定 ============================
+    // 翻页
+    document.getElementById('pager').addEventListener('click', function(e){
+      var a=e.target.closest?e.target.closest('a.page-link'):null; if(!a) return; e.preventDefault();
+      var p=parseInt(a.getAttribute('data-page'),10); var total=Math.max(1, Math.ceil(state.filtered.length/state.pageSize));
+      if(!isNaN(p) && p>=1 && p<=total){ state.page=p; renderTable(); }
+    });
+    // 顶部时间范围切换
+    document.getElementById('topRange').addEventListener('click', function(e){
+      var btn=e.target.closest?e.target.closest('button[data-range]'):null; if(!btn) return;
+      this.querySelectorAll('button').forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active'); state.range=btn.getAttribute('data-range'); state.page=1; applyFilter();
+    });
+    // 筛选与重置
+    document.getElementById('filterForm').addEventListener('submit', function(e){ e.preventDefault(); state.page=1; applyFilter(); });
+    document.getElementById('btnReset').addEventListener('click', function(){
+      document.getElementById('fUser').value=''; document.getElementById('fTask').value='';
+      document.getElementById('fCate').value=''; document.getElementById('fStatus').value='';
+      document.getElementById('fStart').value=''; document.getElementById('fEnd').value='';
+      state.page=1; applyFilter();
+    });
+    // 列表“详情”按钮
+    document.getElementById('tbodyRows').addEventListener('click', function(e){
+      var btn=e.target.closest?e.target.closest('button[data-action="detail"]'):null; if(!btn) return;
+      var id=btn.getAttribute('data-id'); openDetail(id);
+    });
+    // 侧边栏切换
+    document.getElementById('sidebarToggle').addEventListener('click', function(){ document.querySelector('.sidebar').classList.toggle('show'); });
+
+    // 查看所有通知
+    document.addEventListener('DOMContentLoaded', function(){
+      var el=document.getElementById('viewAllNotificationsDashboard');
+      if(el){ el.addEventListener('click', function(e){ e.preventDefault(); var mEl=document.getElementById('modalAllNotifications'); if(mEl){ bootstrap.Modal.getOrCreateInstance(mEl).show(); } }); }
+    });
+
+    // 启动
+    (function init(){ applyFilter(); })();
+  </script>
+<script src="p1-unify.js"></script>
+<script src="p2-unify.js"></script>
+</body>
+</html>

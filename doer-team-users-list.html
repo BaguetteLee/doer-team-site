@@ -1,0 +1,431 @@
+﻿﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"/>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+
+  <title>任务接单平台·平台用户列表</title>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <!-- 样式库 -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css"/>
+  <style>
+    :root{ --primary:#3b7ddd; --primary-light:#e8f0fe; --white:#fff; --light:#f5f6f8; --border:#e2e8f0; }
+    body{ background:var(--light); color:#2d3748; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    .navbar{ background:var(--white); border-bottom:1px solid var(--border); box-shadow:0 2px 10px rgba(0,0,0,.05); position:fixed; top:0; left:0; right:0; z-index:1030; padding-left:250px; }
+    .navbar-brand{ color:var(--primary); font-weight:700; }
+    .sidebar{ background:var(--white); height:100vh; position:fixed; left:0; top:0; width:250px; padding-top:60px; border-right:1px solid var(--border); box-shadow:2px 0 10px rgba(0,0,0,.05); overflow-y:auto; z-index:1000; }
+    .sidebar .nav-link{ color:#4a5568; padding:.8rem 1rem; margin:.1rem .5rem; border-radius:6px; display:flex; align-items:center; transition:all .2s; }
+    .sidebar .nav-link i{ margin-right:10px; color:#718096; }
+    .sidebar .nav-link:hover, .sidebar .nav-link.active{ color:var(--primary); background:var(--primary-light); }
+    .nav-section{ margin:.75rem .25rem .25rem; font-size:.8125rem; color:#6c757d; display:flex; align-items:center; gap:.5rem; }
+    .nav-section .dot{ width:10px; height:10px; border-radius:2px; display:inline-block; }
+    .dot--platform{ background:#0d6efd; } .dot--task{ background:#20c997; } .dot--user{ background:#fd7e14; } .dot--settings{ background:#6f42c1; }
+    .main{ margin-left:250px; padding:20px; padding-top:80px; }
+    @media (max-width: 992px){
+      .sidebar{ width:80px; padding-top:70px; }
+      .sidebar .nav-link span{ display:none; }
+      .sidebar .nav-link i{ margin-right:0; font-size:1.2rem; }
+      .navbar{ padding-left:80px; }
+      .main{ margin-left:80px; }
+    }
+    @media (max-width: 768px){
+      .sidebar{ transform: translateX(-100%); width:250px; }
+      .sidebar.show{ transform: translateX(0); }
+      .navbar{ padding-left:15px; }
+      .main{ margin-left:0; }
+      .navbar-toggler{ display:block; }
+    }
+    .navbar-toggler{ display:none; border:none; font-size:1.25rem; }
+    .navbar-toggler:focus{ box-shadow:none; }
+
+    .dashboard-card{ background:var(--white); border:none; border-radius:10px; box-shadow:0 4px 6px rgba(0,0,0,.04); }
+    .card-header{ background:var(--white); border-bottom:1px solid var(--border); font-weight:600; padding:1rem 1.25rem; }
+    .card-body{ padding:1rem 1.25rem; }
+    .btn{ border-radius:6px; font-weight:500; }
+    .table-sm td,.table-sm th{ padding:.45rem .5rem; vertical-align:middle; white-space:nowrap; }
+    .text-mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+
+    /* 右侧抽屉：统一窄版 */
+    #drawer{ right:-740px; }
+    #drawer.open{ right:0; }
+    #drawerBackdrop{ display:none; }
+    #drawerBackdrop.show{ display:block; }
+
+    /* 表格列宽（中文注释） */
+    th.col-id{ width:160px; } th.col-name{ width:150px; } th.col-phone{ width:150px; }
+    th.col-reg{ width:150px; } th.col-take{ width:110px; } 
+    th.col-done{ width:110px; } th.col-reject{ width:110px; } th.col-balance{ width:220px; }
+    th.col-risk{ width:110px; } th.col-active{ width:150px; } th.col-op{ width:110px; }
+    td.td-balance{ white-space:nowrap; }
+    .badge-pill{ font-weight:700; border-radius:999px; padding:.28rem .6rem; border:1px solid transparent; }
+    .risk-normal{ background:#e5e7eb; color:#111827; border-color:#d1d5db; }
+    .risk-watch{ background:#fef3c7; color:#92400e; border-color:#fde68a; }
+    .risk-black{ background:#fee2e2; color:#991b1b; border-color:#fecaca; }
+  </style>
+<link rel="stylesheet" href="p1-unify.css"/>
+<link rel="stylesheet" href="p2-unify.css"/>
+</head>
+<body>
+  <!-- 顶部（与接单平台一致：铃铛 + 用户下拉） -->
+  <nav class="navbar navbar-expand-lg navbar-light">
+    <div class="container-fluid">
+      <button id="sidebarToggle" class="navbar-toggler" type="button"><span class="navbar-toggler-icon"></span></button>
+      <a class="navbar-brand" href="doer-team-analytics-dashboard.html">
+        <strong><i class="bi bi-lightning-charge me-2"></i>任务接单管理平台</strong>
+      </a>
+      <div class="collapse navbar-collapse">
+        <ul class="navbar-nav ms-auto me-4">
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" id="notifDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false" href="#">
+              <i class="bi bi-bell"></i><span class="badge bg-danger ms-1">3</span>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="#"><i class="bi bi-list-task me-2"></i>有 3 个新任务已上线</a></li>
+              <li><a class="dropdown-item" href="#"><i class="bi bi-clock-history me-2"></i>1 个任务即将截止</a></li>
+              <li><hr class="dropdown-divider"/></li>
+              <li><a class="dropdown-item" href="#" id="viewAllNotifications"><i class="bi bi-list-ul me-2"></i>查看所有通知</a></li>
+            </ul>
+          </li>
+          <li class="nav-item dropdown ms-2">
+            <a class="nav-link dropdown-toggle d-flex align-items-center" data-bs-toggle="dropdown" href="#" role="button">
+              <i class="bi bi-person-circle me-2"></i> 接单管理员
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="doer-team-account-management.html"><i class="bi bi-person-gear me-2"></i>账号与安全</a></li>
+              <li><hr class="dropdown-divider"/></li>
+              <li><a class="dropdown-item" href="#"><i class="bi bi-box-arrow-right me-2"></i>退出</a></li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 侧边栏 -->
+  <aside class="sidebar">
+    <ul class="nav flex-column">
+      <li class="nav-section"><span class="dot dot--platform"></span><span>平台</span></li>
+      <li><a class="nav-link" href="doer-team-analytics-dashboard.html"><i class="bi bi-speedometer2 me-2"></i><span>平台总仪表盘</span></a></li>
+      <li><a class="nav-link" href="doer-team-finance-platform-fund-flow.html"><i class="bi bi-cash-coin me-2"></i><span>平台资金流水</span></a></li>
+
+      <li class="nav-section"><span class="dot dot--task"></span><span>任务</span></li>
+      <li><a class="nav-link" href="doer-team-orders-situation.html"><i class="bi bi-cart-check me-2"></i><span>任务接单情况</span></a></li>
+      <li><a class="nav-link" href="doer-team-tasks-completion.html"><i class="bi bi-check2-circle me-2"></i><span>任务完成情况</span></a></li>
+      <li><a class="nav-link" href="doer-team-tasks-list.html"><i class="bi bi-list-task me-2"></i><span>可接任务列表</span></a></li>
+
+      <li class="nav-section"><span class="dot dot--user"></span><span>用户</span></li>
+      <li><a class="nav-link active" href="doer-team-users-list.html"><i class="bi bi-people me-2"></i><span>平台用户列表</span></a></li>
+      <li><a class="nav-link" href="doer-team-finance-withdrawal-list.html"><i class="bi bi-bank me-2"></i><span>用户提现列表</span></a></li>
+      <li><a class="nav-link" href="doer-team-finance-user-fund-flow.html"><i class="bi bi-journal-text me-2"></i><span>用户资金流水</span></a></li>
+
+      <li class="nav-section"><span class="dot dot--settings"></span><span>设置</span></li>
+      <li><a class="nav-link" href="doer-team-settings-categories.html"><i class="bi bi-sliders me-2"></i><span>业务分类概览</span></a></li>
+      <li><a class="nav-link" href="doer-team-system-api-monitoring.html"><i class="bi bi-activity me-2"></i><span>接口管理监控</span></a></li>
+      <li><a class="nav-link" href="doer-team-finance-payment-account.html"><i class="bi bi-credit-card me-2"></i><span>支付账户设置</span></a></li>
+      <li><a class="nav-link" href="doer-team-account-management.html"><i class="bi bi-person-gear me-2"></i><span>账号管理设置</span></a></li>
+      <li><a class="nav-link" href="doer-team-team-profile.html"><i class="bi bi-building-gear me-2"></i><span>团队资料设置</span></a></li>
+    </ul>
+  </aside>
+
+  <main class="main">
+    <!-- KPI 概览 -->
+    <section class="row g-3 mb-3">
+      <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body">
+        <div class="metric-sub">平台总用户数</div><div class="metric-value" id="kpiTotal">--</div>
+        <div class="metric-sub">近30日新增 <span id="kpiNew30">--</span></div>
+      </div></div></div>
+      <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body">
+        <div class="metric-sub">启用（非黑名单）</div><div class="metric-value" id="kpiActive">--</div>
+        <div class="metric-sub">观察 <span id="kpiWatch">--</span></div>
+      </div></div></div>
+      <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body">
+        <div class="metric-sub">黑名单</div><div class="metric-value" id="kpiBlack">--</div>
+        <div class="metric-sub">占比 <span id="kpiBlackPct">--</span></div>
+      </div></div></div>
+      <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body">
+        <div class="metric-sub">活跃（近7日登录）</div><div class="metric-value" id="kpiActive7d">--</div>
+        <div class="metric-sub">近7日接单 <span id="kpiTake7d">--</span></div>
+      </div></div></div>
+    </section>
+
+    <!-- 筛选条 -->
+    <section class="card mb-3"><div class="card-body py-2">
+      <div class="filters d-flex align-items-center gap-2 flex-wrap">
+        <input id="kw" class="form-control form-control-sm" style="width:220px" placeholder="用户ID / 用户名 / 手机号码"/>
+        <select id="risk" class="form-select form-select-sm" style="width:130px">
+          <option value="">风控（全部）</option><option value="normal">正常</option><option value="watch">观察</option><option value="black">黑名单</option>
+        </select>
+        <input id="regFrom" class="form-control form-control-sm" style="width:140px" type="date"/><span class="text-muted">—</span>
+        <input id="regTo" class="form-control form-control-sm" style="width:140px" type="date"/>
+        <input id="balMin" class="form-control form-control-sm" style="width:110px" type="number" placeholder="余额 ≥"/>
+        <input id="balMax" class="form-control form-control-sm" style="width:110px" type="number" placeholder="余额 ≤"/>
+        <select id="sort" class="form-select form-select-sm" style="width:170px">
+          <option value="recent">最近注册</option><option value="balance">余额（可用）</option><option value="take">接单数</option><option value="active">最近活跃</option>
+        </select>
+        <button id="btnQuery" class="btn btn-primary btn-sm"><i class="bi bi-funnel me-1"></i>筛选</button>
+        <button id="btnReset" class="btn btn-outline-secondary btn-sm">重置</button>
+        <button id="btnExport" class="btn btn-outline-primary btn-sm"><i class="bi bi-download me-1"></i>导出 CSV</button>
+      </div>
+    </div></section>
+
+    <!-- 列表 -->
+    <section class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <div>平台用户列表（<span id="totalCount">0</span>）</div>
+        <div class="small text-muted">每页 15 条</div>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover table-sm align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th class="col-id">用户 ID</th>
+                <th class="col-name">用户名</th>
+                <th class="col-phone">手机号码</th>
+                <th class="col-reg">注册时间</th>
+                <th class="col-take">接单数</th>
+                <th class="col-done">已完成</th>
+                <th class="col-reject">被驳回</th>
+                <th class="col-balance">余额（可用/冻结）</th>
+                <th class="col-risk">风控</th>
+                <th class="col-active">最近活跃</th>
+                <th class="col-op">操作</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyUsers"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card-footer d-flex justify-content-between align-items-center">
+        <div class="text-muted small">注：仅查看；不涉及总部的处理动作。</div>
+        <nav><ul class="pagination pagination-sm mb-0" id="pager"></ul></nav>
+      </div>
+    </section>
+  </main>
+
+  <!-- 抽屉：用户详情（只读） -->
+  <aside id="drawer" class="position-fixed top-0 bottom-0 bg-white border-start" style="width: 740px; box-shadow:-8px 0 24px rgba(0,0,0,.08); z-index:1060; transition:right .25s;">
+    <div class="d-flex align-items-center justify-content-between border-bottom p-2">
+      <div class="d-flex align-items-center gap-2"><h6 class="mb-0">用户详情（接单视角） · <span id="dvUid" class="text-mono"></span></h6><span id="dvRisk" class="badge-pill risk-normal">—</span></div>
+      <button id="btnCloseDrawer" class="btn btn-sm btn-outline-secondary"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="p-3" style="overflow:auto; height: calc(100% - 48px);">
+      <div class="row g-3 mb-2">
+        <div class="col-md-6"><div class="small text-muted">用户名</div><div class="fw-semibold" id="dvName">—</div></div>
+        <div class="col-md-6"><div class="small text-muted">手机号码</div><div class="fw-semibold" id="dvPhone">—</div></div>
+        <div class="col-md-6"><div class="small text-muted">注册时间</div><div class="fw-semibold" id="dvReg">—</div></div>
+        <div class="col-md-6"><div class="small text-muted">最近活跃</div><div class="fw-semibold" id="dvActive">—</div></div>
+        <div class="col-md-6"><div class="small text-muted">余额（可用/冻结）</div><div class="fw-semibold" id="dvBal">—</div></div>
+        <div class="col-md-6"><div class="small text-muted">接单统计</div><div class="fw-semibold" id="dvStats">—</div></div>
+      </div>
+      <!-- 选项卡（修复：结构嵌套与默认激活） -->
+      <ul class="nav nav-tabs mt-2" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active" id="tab-fund-tab" data-bs-toggle="tab" data-bs-target="#tab-fund" type="button" role="tab" aria-controls="tab-fund" aria-selected="true">资金流水</button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="tab-take-tab" data-bs-toggle="tab" data-bs-target="#tab-take" type="button" role="tab" aria-controls="tab-take" aria-selected="false">接单数据</button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="tab-risk-tab" data-bs-toggle="tab" data-bs-target="#tab-risk" type="button" role="tab" aria-controls="tab-risk" aria-selected="false">风控记录</button>
+        </li>
+      </ul>
+      <div class="tab-content mt-3">
+        <div class="tab-pane fade show active" id="tab-fund" role="tabpanel" aria-labelledby="tab-fund-tab">
+          <div class="small text-muted">最近 10 条资金流水（模拟）</div>
+          <div class="table-responsive mt-2">
+            <table class="table table-sm align-middle">
+              <thead>
+                <tr><th style="width:160px;">时间</th><th style="width:120px;">类型</th><th class="text-end" style="width:110px;">金额</th><th style="width:140px;">余额</th><th>备注</th></tr>
+              </thead>
+              <tbody id="fundTbody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="tab-pane fade" id="tab-take" role="tabpanel" aria-labelledby="tab-take-tab">
+          <div class="small text-muted">按分类统计该用户的接单数据（模拟）。</div>
+          <div class="table-responsive mt-2">
+            <table class="table table-sm align-middle mb-0">
+              <thead><tr><th>分类</th><th>接单数</th><th>已完成</th><th>被驳回</th></tr></thead>
+              <tbody id="takeTbody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="tab-pane fade" id="tab-risk" role="tabpanel" aria-labelledby="tab-risk-tab">
+          <div class="small text-muted">与该用户相关的风控记录（只读）。</div>
+          <div class="table-responsive mt-2">
+            <table class="table table-sm align-middle">
+              <thead><tr><th style="width:160px;">时间</th><th style="width:120px;">标签</th><th>内容</th><th style="width:120px;">记录人</th></tr></thead>
+              <tbody id="riskTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div id="drawerBackdrop" class="position-fixed top-0 start-0 w-100 h-100" style="background: rgba(0,0,0,.2); z-index:1050;"></div>
+
+  <!-- 脚本库：仅引入外部文件，避免在 src 标签内部写入脚本 -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    // ===== 通用工具（中文注释） =====
+    function maskPhone(s){
+      // 手机号脱敏：130****0000
+      if(!s) return '—';
+      const m = String(s).match(/(\d{3})(\d{4})(\d{4})/);
+      if(m) return m[1]+'****'+m[3];
+      return String(s).replace(/\d(?=\d{4})/g,'*');
+    }
+
+    // 侧边栏显示/隐藏
+    document.getElementById('sidebarToggle')?.addEventListener('click', function(){
+      document.querySelector('.sidebar')?.classList.toggle('show');
+    });
+
+    /* ===== 模拟数据（保持与原版一致） ===== */
+    var USERS = JSON.parse('[{"id": "U300000", "name": "\u5f20\u4e091", "phone": "13000000000", "reg": "2025-06-15 12:00", "active": "2025-09-04 12:00", "take": 224, "run": 42, "done": 175, "reject": 7, "bal": 12664.85, "frozen": 1979.44, "risk": "watch"}, {"id": "U300001", "name": "\u674e\u56db2", "phone": "13000007919", "reg": "2024-12-19 12:00", "active": "2025-09-12 12:00", "take": 268, "run": 42, "done": 226, "reject": 0, "bal": 310.41, "frozen": 1865.56, "risk": "watch"}, {"id": "U300002", "name": "\u738b\u4e943", "phone": "13000015838", "reg": "2025-08-03 12:00", "active": "2025-09-13 12:00", "take": 128, "run": 35, "done": 93, "reject": 0, "bal": 6609.15, "frozen": 1990.75, "risk": "watch"}, {"id": "U300003", "name": "\u8d75\u516d4", "phone": "13000023757", "reg": "2024-10-27 12:00", "active": "2025-09-03 12:00", "take": 27, "run": 7, "done": 12, "reject": 8, "bal": 7513.53, "frozen": 231.62, "risk": "watch"}, {"id": "U300004", "name": "\u5b59\u4e035", "phone": "13000031676", "reg": "2025-08-27 12:00", "active": "2025-09-13 12:00", "take": 55, "run": 2, "done": 53, "reject": 0, "bal": 6851.6, "frozen": 1104.01, "risk": "watch"}, {"id": "U300005", "name": "\u5468\u516b6", "phone": "13000039595", "reg": "2025-02-14 12:00", "active": "2025-09-02 12:00", "take": 87, "run": 4, "done": 83, "reject": 0, "bal": 7102.14, "frozen": 1640.29, "risk": "normal"}, {"id": "U300006", "name": "\u5434\u4e5d7", "phone": "13000047514", "reg": "2024-08-04 12:00", "active": "2025-09-11 12:00", "take": 116, "run": 23, "done": 83, "reject": 10, "bal": 11346.41, "frozen": 1525.59, "risk": "black"}, {"id": "U300007", "name": "\u90d1\u53418", "phone": "13000055433", "reg": "2024-08-30 12:00", "active": "2025-09-15 12:00", "take": 72, "run": 12, "done": 52, "reject": 8, "bal": 12422.57, "frozen": 402.16, "risk": "normal"}, {"id": "U300008", "name": "\u94b1\u5341\u4e009", "phone": "13000063352", "reg": "2024-12-07 12:00", "active": "2025-09-04 12:00", "take": 159, "run": 17, "done": 135, "reject": 7, "bal": 7571.44, "frozen": 635.9, "risk": "watch"}, {"id": "U300009", "name": "\u51af\u5341\u4e8c10", "phone": "13000071271", "reg": "2025-02-22 12:00", "active": "2025-09-09 12:00", "take": 23, "run": 5, "done": 16, "reject": 2, "bal": 10799.58, "frozen": 1985.65, "risk": "watch"}, {"id": "U300010", "name": "\u9648\u5341\u4e0911", "phone": "13000079190", "reg": "2025-09-06 12:00", "active": "2025-09-02 12:00", "take": 45, "run": 7, "done": 30, "reject": 8, "bal": 3408.29, "frozen": 1217.8, "risk": "black"}, {"id": "U300011", "name": "\u891a\u5341\u56db12", "phone": "13000087109", "reg": "2024-10-24 12:00", "active": "2025-09-14 12:00", "take": 102, "run": 20, "done": 72, "reject": 10, "bal": 5288.29, "frozen": 1854.15, "risk": "watch"}, {"id": "U300012", "name": "\u536b\u5341\u4e9413", "phone": "13000095028", "reg": "2024-08-13 12:00", "active": "2025-08-29 12:00", "take": 166, "run": 12, "done": 152, "reject": 2, "bal": 1078.09, "frozen": 1627.39, "risk": "watch"}, {"id": "U300013", "name": "\u848b\u5341\u516d14", "phone": "13000102947", "reg": "2025-02-28 12:00", "active": "2025-09-12 12:00", "take": 28, "run": 5, "done": 13, "reject": 10, "bal": 14378.37, "frozen": 814.03, "risk": "normal"}, {"id": "U300014", "name": "\u6c88\u5341\u4e0315", "phone": "13000110866", "reg": "2024-08-24 12:00", "active": "2025-08-30 12:00", "take": 17, "run": 4, "done": 6, "reject": 7, "bal": 7641.4, "frozen": 1333.87, "risk": "normal"}, {"id": "U300015", "name": "\u97e9\u5341\u516b16", "phone": "13000118785", "reg": "2025-06-16 12:00", "active": "2025-08-31 12:00", "take": 45, "run": 5, "done": 34, "reject": 6, "bal": 11631.36, "frozen": 966.35, "risk": "watch"}, {"id": "U300016", "name": "\u6768\u5341\u4e5d17", "phone": "13000126704", "reg": "2025-08-12 12:00", "active": "2025-08-21 12:00", "take": 142, "run": 28, "done": 114, "reject": 0, "bal": 6351.31, "frozen": 341.26, "risk": "normal"}, {"id": "U300017", "name": "\u6731\u4e8c\u534118", "phone": "13000134623", "reg": "2025-03-18 12:00", "active": "2025-08-28 12:00", "take": 84, "run": 24, "done": 53, "reject": 7, "bal": 836.09, "frozen": 279.18, "risk": "black"}, {"id": "U300018", "name": "\u5f20\u4e0919", "phone": "13000142542", "reg": "2024-12-12 12:00", "active": "2025-08-19 12:00", "take": 255, "run": 2, "done": 250, "reject": 3, "bal": 13501.64, "frozen": 731.45, "risk": "normal"}, {"id": "U300019", "name": "\u674e\u56db20", "phone": "13000150461", "reg": "2025-03-03 12:00", "active": "2025-08-29 12:00", "take": 228, "run": 33, "done": 188, "reject": 7, "bal": 4688.86, "frozen": 1068.67, "risk": "watch"}, {"id": "U300020", "name": "\u738b\u4e9421", "phone": "13000158380", "reg": "2025-06-28 12:00", "active": "2025-08-24 12:00", "take": 15, "run": 1, "done": 12, "reject": 2, "bal": 14314.22, "frozen": 47.0, "risk": "black"}, {"id": "U300021", "name": "\u8d75\u516d22", "phone": "13000166299", "reg": "2025-03-25 12:00", "active": "2025-08-28 12:00", "take": 137, "run": 35, "done": 93, "reject": 9, "bal": 6374.39, "frozen": 1366.29, "risk": "normal"}, {"id": "U300022", "name": "\u5b59\u4e0323", "phone": "13000174218", "reg": "2025-07-01 12:00", "active": "2025-09-13 12:00", "take": 58, "run": 6, "done": 50, "reject": 2, "bal": 477.22, "frozen": 893.71, "risk": "normal"}, {"id": "U300023", "name": "\u5468\u516b24", "phone": "13000182137", "reg": "2025-08-02 12:00", "active": "2025-08-21 12:00", "take": 70, "run": 13, "done": 55, "reject": 2, "bal": 4629.99, "frozen": 1884.18, "risk": "watch"}, {"id": "U300024", "name": "\u5434\u4e5d25", "phone": "13000190056", "reg": "2024-12-29 12:00", "active": "2025-08-20 12:00", "take": 122, "run": 22, "done": 98, "reject": 2, "bal": 2840.75, "frozen": 755.62, "risk": "black"}, {"id": "U300025", "name": "\u90d1\u534126", "phone": "13000197975", "reg": "2024-08-22 12:00", "active": "2025-08-31 12:00", "take": 33, "run": 5, "done": 20, "reject": 8, "bal": 13120.65, "frozen": 1548.5, "risk": "normal"}, {"id": "U300026", "name": "\u94b1\u5341\u4e0027", "phone": "13000205894", "reg": "2025-02-21 12:00", "active": "2025-09-03 12:00", "take": 42, "run": 5, "done": 28, "reject": 9, "bal": 2711.93, "frozen": 1422.98, "risk": "watch"}, {"id": "U300027", "name": "\u51af\u5341\u4e8c28", "phone": "13000213813", "reg": "2024-09-16 12:00", "active": "2025-08-29 12:00", "take": 170, "run": 38, "done": 129, "reject": 3, "bal": 5894.18, "frozen": 618.82, "risk": "watch"}, {"id": "U300028", "name": "\u9648\u5341\u4e0929", "phone": "13000221732", "reg": "2024-12-24 12:00", "active": "2025-08-23 12:00", "take": 291, "run": 42, "done": 240, "reject": 9, "bal": 1568.59, "frozen": 1202.36, "risk": "black"}, {"id": "U300029", "name": "\u891a\u5341\u56db30", "phone": "13000229651", "reg": "2024-11-07 12:00", "active": "2025-08-25 12:00", "take": 175, "run": 50, "done": 121, "reject": 4, "bal": 4445.12, "frozen": 1249.45, "risk": "black"}, {"id": "U300030", "name": "\u536b\u5341\u4e9431", "phone": "13000237570", "reg": "2025-06-02 12:00", "active": "2025-09-15 12:00", "take": 176, "run": 51, "done": 120, "reject": 5, "bal": 1073.19, "frozen": 1315.92, "risk": "watch"}, {"id": "U300031", "name": "\u848b\u5341\u516d32", "phone": "13000245489", "reg": "2025-07-14 12:00", "active": "2025-08-21 12:00", "take": 48, "run": 9, "done": 29, "reject": 10, "bal": 12233.51, "frozen": 1519.83, "risk": "watch"}, {"id": "U300032", "name": "\u6c88\u5341\u4e0333", "phone": "13000253408", "reg": "2024-12-23 12:00", "active": "2025-08-29 12:00", "take": 20, "run": 4, "done": 9, "reject": 7, "bal": 7116.11, "frozen": 1026.01, "risk": "watch"}, {"id": "U300033", "name": "\u97e9\u5341\u516b34", "phone": "13000261327", "reg": "2025-08-02 12:00", "active": "2025-09-10 12:00", "take": 22, "run": 0, "done": 16, "reject": 6, "bal": 726.4, "frozen": 551.16, "risk": "black"}, {"id": "U300034", "name": "\u6768\u5341\u4e5d35", "phone": "13000269246", "reg": "2025-02-12 12:00", "active": "2025-08-25 12:00", "take": 228, "run": 31, "done": 194, "reject": 3, "bal": 6044.19, "frozen": 655.0, "risk": "normal"}, {"id": "U300035", "name": "\u6731\u4e8c\u534136", "phone": "13000277165", "reg": "2024-10-19 12:00", "active": "2025-08-19 12:00", "take": 53, "run": 0, "done": 51, "reject": 2, "bal": 7429.09, "frozen": 1434.35, "risk": "normal"}, {"id": "U300036", "name": "\u5f20\u4e0937", "phone": "13000285084", "reg": "2024-08-04 12:00", "active": "2025-09-03 12:00", "take": 144, "run": 10, "done": 127, "reject": 7, "bal": 5850.69, "frozen": 1229.42, "risk": "black"}, {"id": "U300037", "name": "\u674e\u56db38", "phone": "13000293003", "reg": "2024-09-08 12:00", "active": "2025-08-19 12:00", "take": 13, "run": 0, "done": 10, "reject": 3, "bal": 4744.82, "frozen": 782.45, "risk": "normal"}, {"id": "U300038", "name": "\u738b\u4e9439", "phone": "13000300922", "reg": "2025-07-23 12:00", "active": "2025-08-31 12:00", "take": 99, "run": 2, "done": 93, "reject": 4, "bal": 9337.51, "frozen": 750.84, "risk": "black"}, {"id": "U300039", "name": "\u8d75\u516d40", "phone": "13000308841", "reg": "2025-01-14 12:00", "active": "2025-09-14 12:00", "take": 95, "run": 20, "done": 72, "reject": 3, "bal": 10212.18, "frozen": 743.95, "risk": "black"}, {"id": "U300040", "name": "\u5b59\u4e0341", "phone": "13000316760", "reg": "2024-09-24 12:00", "active": "2025-09-11 12:00", "take": 143, "run": 3, "done": 140, "reject": 0, "bal": 4899.47, "frozen": 508.48, "risk": "normal"}, {"id": "U300041", "name": "\u5468\u516b42", "phone": "13000324679", "reg": "2024-09-24 12:00", "active": "2025-09-01 12:00", "take": 112, "run": 8, "done": 100, "reject": 4, "bal": 10771.21, "frozen": 314.33, "risk": "watch"}, {"id": "U300042", "name": "\u5434\u4e5d43", "phone": "13000332598", "reg": "2025-01-11 12:00", "active": "2025-09-05 12:00", "take": 233, "run": 32, "done": 191, "reject": 10, "bal": 4281.35, "frozen": 348.69, "risk": "watch"}, {"id": "U300043", "name": "\u90d1\u534144", "phone": "13000340517", "reg": "2024-10-24 12:00", "active": "2025-09-09 12:00", "take": 60, "run": 3, "done": 54, "reject": 3, "bal": 612.21, "frozen": 1620.87, "risk": "black"}, {"id": "U300044", "name": "\u94b1\u5341\u4e0045", "phone": "13000348436", "reg": "2025-03-03 12:00", "active": "2025-09-17 12:00", "take": 48, "run": 7, "done": 41, "reject": 0, "bal": 6032.46, "frozen": 882.47, "risk": "watch"}, {"id": "U300045", "name": "\u51af\u5341\u4e8c46", "phone": "13000356355", "reg": "2025-05-08 12:00", "active": "2025-09-17 12:00", "take": 288, "run": 12, "done": 272, "reject": 4, "bal": 2935.51, "frozen": 741.15, "risk": "normal"}, {"id": "U300046", "name": "\u9648\u5341\u4e0947", "phone": "13000364274", "reg": "2025-03-02 12:00", "active": "2025-09-12 12:00", "take": 79, "run": 13, "done": 60, "reject": 6, "bal": 7988.29, "frozen": 98.32, "risk": "normal"}, {"id": "U300047", "name": "\u891a\u5341\u56db48", "phone": "13000372193", "reg": "2025-02-06 12:00", "active": "2025-09-05 12:00", "take": 292, "run": 21, "done": 262, "reject": 9, "bal": 12055.37, "frozen": 1686.99, "risk": "watch"}, {"id": "U300048", "name": "\u536b\u5341\u4e9449", "phone": "13000380112", "reg": "2024-07-29 12:00", "active": "2025-09-17 12:00", "take": 47, "run": 1, "done": 36, "reject": 10, "bal": 2905.57, "frozen": 119.29, "risk": "black"}, {"id": "U300049", "name": "\u848b\u5341\u516d50", "phone": "13000388031", "reg": "2024-11-01 12:00", "active": "2025-08-31 12:00", "take": 261, "run": 36, "done": 215, "reject": 10, "bal": 5136.13, "frozen": 539.46, "risk": "watch"}, {"id": "U300050", "name": "\u6c88\u5341\u4e0351", "phone": "13000395950", "reg": "2025-04-13 12:00", "active": "2025-09-08 12:00", "take": 14, "run": 3, "done": 10, "reject": 1, "bal": 10055.89, "frozen": 372.69, "risk": "normal"}, {"id": "U300051", "name": "\u97e9\u5341\u516b52", "phone": "13000403869", "reg": "2024-09-25 12:00", "active": "2025-08-22 12:00", "take": 107, "run": 11, "done": 91, "reject": 5, "bal": 975.53, "frozen": 74.3, "risk": "watch"}, {"id": "U300052", "name": "\u6768\u5341\u4e5d53", "phone": "13000411788", "reg": "2025-04-20 12:00", "active": "2025-08-27 12:00", "take": 214, "run": 10, "done": 203, "reject": 1, "bal": 3566.89, "frozen": 717.18, "risk": "watch"}, {"id": "U300053", "name": "\u6731\u4e8c\u534154", "phone": "13000419707", "reg": "2025-02-10 12:00", "active": "2025-09-11 12:00", "take": 109, "run": 23, "done": 78, "reject": 8, "bal": 6409.79, "frozen": 649.19, "risk": "normal"}, {"id": "U300054", "name": "\u5f20\u4e0955", "phone": "13000427626", "reg": "2025-05-21 12:00", "active": "2025-09-01 12:00", "take": 30, "run": 6, "done": 15, "reject": 9, "bal": 8035.0, "frozen": 1256.45, "risk": "normal"}, {"id": "U300055", "name": "\u674e\u56db56", "phone": "13000435545", "reg": "2025-08-28 12:00", "active": "2025-08-26 12:00", "take": 198, "run": 29, "done": 167, "reject": 2, "bal": 12976.51, "frozen": 882.97, "risk": "normal"}, {"id": "U300056", "name": "\u738b\u4e9457", "phone": "13000443464", "reg": "2025-04-17 12:00", "active": "2025-08-27 12:00", "take": 38, "run": 2, "done": 26, "reject": 10, "bal": 13551.12, "frozen": 1066.51, "risk": "normal"}, {"id": "U300057", "name": "\u8d75\u516d58", "phone": "13000451383", "reg": "2025-04-02 12:00", "active": "2025-09-05 12:00", "take": 117, "run": 33, "done": 79, "reject": 5, "bal": 267.56, "frozen": 703.84, "risk": "black"}, {"id": "U300058", "name": "\u5b59\u4e0359", "phone": "13000459302", "reg": "2025-04-25 12:00", "active": "2025-08-29 12:00", "take": 22, "run": 4, "done": 8, "reject": 10, "bal": 11252.7, "frozen": 364.66, "risk": "black"}, {"id": "U300059", "name": "\u5468\u516b60", "phone": "13000467221", "reg": "2024-12-25 12:00", "active": "2025-08-20 12:00", "take": 221, "run": 13, "done": 200, "reject": 8, "bal": 8367.4, "frozen": 1551.16, "risk": "black"}]');
+
+    /* ===== 状态与工具 ===== */
+    var state = { pageSize:15, page:1, kw:'', risk:'', regFrom:'', regTo:'', balMin:'', balMax:'', sort:'recent', filtered:[] };
+    function riskBadgeClass(k){ return k==='black'?'risk-black':(k==='watch'?'risk-watch':'risk-normal'); }
+
+    /* ===== 过滤与渲染 ===== */
+    function applyFilters(){
+      var rows = USERS.slice(0);
+      // 关键词
+      if(state.kw) rows = rows.filter(r => r.id.includes(state.kw)||r.name.includes(state.kw)||r.phone.includes(state.kw));
+      // 风控
+      if(state.risk) rows = rows.filter(r => r.risk===state.risk);
+      // 注册时间
+      if(state.regFrom) rows = rows.filter(r => new Date(r.reg) >= new Date(state.regFrom));
+      if(state.regTo) rows = rows.filter(r => new Date(r.reg) <= new Date(state.regTo+' 23:59:59'));
+      // 余额范围
+      if(state.balMin!=='') rows = rows.filter(r => Number(r.bal) >= Number(state.balMin));
+      if(state.balMax!=='') rows = rows.filter(r => Number(r.bal) <= Number(state.balMax));
+      // 排序
+      rows.sort((a,b)=>{
+        if(state.sort==='recent') return new Date(b.reg)-new Date(a.reg);
+        if(state.sort==='balance') return b.bal - a.bal;
+        if(state.sort==='take') return b.take - a.take;
+        if(state.sort==='active') return new Date(b.active)-new Date(a.active);
+        return 0;
+      });
+      state.filtered = rows;
+      renderPage(1);
+      // KPI
+      document.getElementById('kpiTotal').textContent = rows.length;
+      document.getElementById('kpiNew30').textContent = Math.floor(rows.length*0.12);
+      var active = rows.filter(r=> r.risk!=='black').length;
+      document.getElementById('kpiActive').textContent = active;
+      document.getElementById('kpiWatch').textContent = rows.filter(r=> r.risk==='watch').length;
+      var black = rows.filter(r=> r.risk==='black').length;
+      document.getElementById('kpiBlack').textContent = black;
+      document.getElementById('kpiBlackPct').textContent = (rows.length? (black*100/rows.length).toFixed(1):'0')+'%';
+      document.getElementById('kpiActive7d').textContent = rows.filter(r=> (new Date()-new Date(r.active))/86400000 <= 7).length;
+      document.getElementById('kpiTake7d').textContent = Math.floor(rows.length*3.2);
+    }
+
+    function renderPage(p){
+      state.page=p;
+      var total = state.filtered.length;
+      var pageTotal = Math.max(1, Math.ceil(total/state.pageSize));
+      var start=(p-1)*state.pageSize, pageRows = state.filtered.slice(start, start+state.pageSize);
+      document.getElementById('totalCount').textContent = total;
+      var tbody = document.getElementById('tbodyUsers'); tbody.innerHTML='';
+      pageRows.forEach(r=>{
+        var tr=document.createElement('tr');
+        // 修复：表头/内容对齐 —— 列顺序严格匹配 thead；手机号脱敏
+        tr.innerHTML = `
+          <td class="text-mono">${r.id}</td>
+          <td>${r.name}</td>
+          <td>${maskPhone(r.phone)}</td>
+          <td>${r.reg}</td>
+          <td>${r.take}</td>
+          <td>${r.done}</td>
+          <td>${r.reject}</td>
+          <td class="td-balance">¥ ${r.bal.toFixed(2)} / 冻 ¥ ${r.frozen.toFixed(2)}</td>
+          <td><span class="badge-pill ${riskBadgeClass(r.risk)}">${r.risk==='black'?'黑名单':(r.risk==='watch'?'观察':'正常')}</span></td>
+          <td>${r.active}</td>
+          <td><button class="btn btn-sm btn-outline-primary" data-id="${r.id}">详情</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+      // 绑定详情
+      tbody.querySelectorAll('button[data-id]').forEach(btn=> btn.addEventListener('click', ()=> openDrawer(btn.getAttribute('data-id')) ));
+      // 分页
+      var pager = document.getElementById('pager'); pager.innerHTML='';
+      for(var i=1;i<=pageTotal;i++){ var li=document.createElement('li'); li.className='page-item'+(i===p?' active':''); li.innerHTML=`<a class="page-link" href="#">${i}</a>`; li.addEventListener('click', (e)=>{e.preventDefault(); renderPage(Number(e.target.textContent));}); pager.appendChild(li); }
+    }
+
+    /* ===== 抽屉 ===== */
+    function openDrawer(id){
+      var r = USERS.find(x=>x.id===id); if(!r) return;
+      document.getElementById('dvUid').textContent = r.id;
+      document.getElementById('dvRisk').className = 'badge-pill '+riskBadgeClass(r.risk);
+      document.getElementById('dvRisk').textContent = (r.risk==='black'?'黑名单':(r.risk==='watch'?'观察':'正常'));
+      document.getElementById('dvName').textContent = r.name;
+      document.getElementById('dvPhone').textContent = maskPhone(r.phone);
+      document.getElementById('dvReg').textContent = r.reg;
+      document.getElementById('dvActive').textContent = r.active;
+      document.getElementById('dvBal').textContent = '¥ '+r.bal.toFixed(2)+' / 冻 ¥ '+r.frozen.toFixed(2);
+      document.getElementById('dvStats').textContent = '接单 '+r.take+' · 已完成 '+r.done+' · 被驳回 '+r.reject;
+
+      // 生成模拟资金流水
+      var fundBody = document.getElementById('fundTbody'); fundBody.innerHTML='';
+      for(var i=0;i<Math.min(10, Math.floor(3+Math.random()*8)); i++){
+        var amt = (Math.random()<.5?1:-1) * (50+Math.random()*200);
+        var tr=document.createElement('tr'); tr.innerHTML = `<td>2025-09-${String(10+i).padStart(2,'0')} 12:${String(10+i).padStart(2,'0')}</td><td>${amt>0?'任务佣金':'提现'}</td><td class="text-end">¥ ${Math.abs(amt).toFixed(2)}</td><td>¥ ${(r.bal + amt).toFixed(2)}</td><td>模拟</td>`;
+        fundBody.appendChild(tr);
+      }
+      // 接单分类统计（修复：取消“进行中”列，严格匹配表头）
+      var takeBody = document.getElementById('takeTbody'); takeBody.innerHTML='';
+      ['电商互动','内容发布','表单收集','线下打卡','数据标注'].forEach(c=>{
+        var t = Math.floor(r.take*Math.random()*0.4)+1;
+        var done = Math.max(0, Math.floor(t*0.7 + Math.random()*3) );
+        var rej = Math.max(0, t - done);
+        var tr=document.createElement('tr'); tr.innerHTML=`<td>${c}</td><td>${t}</td><td>${done}</td><td>${rej}</td>`; 
+        takeBody.appendChild(tr);
+      });
+      // 风控记录
+      var riskBody = document.getElementById('riskTbody'); riskBody.innerHTML='';
+      var labels={normal:'正常',watch:'观察',black:'黑名单'}; 
+      for(var j=0;j<3;j++){ 
+        var tr=document.createElement('tr'); tr.innerHTML=`<td>2025-09-${String(8+j).padStart(2,'0')} 10:${20+j}</td><td>${labels[r.risk]}</td><td>模拟记录</td><td>系统</td>`; 
+        riskBody.appendChild(tr); 
+      }
+      document.getElementById('drawer').classList.add('open');
+      document.getElementById('drawerBackdrop').classList.add('show');
+    }
+    document.getElementById('btnCloseDrawer').addEventListener('click', ()=>{ document.getElementById('drawer').classList.remove('open'); document.getElementById('drawerBackdrop').classList.remove('show'); });
+    document.getElementById('drawerBackdrop').addEventListener('click', ()=>{ document.getElementById('btnCloseDrawer').click(); });
+
+    /* ===== 交互绑定 ===== */
+    document.getElementById('btnQuery').addEventListener('click', ()=>{
+      state.kw=document.getElementById('kw').value.trim(); state.risk=document.getElementById('risk').value; state.regFrom=document.getElementById('regFrom').value; state.regTo=document.getElementById('regTo').value; state.balMin=document.getElementById('balMin').value; state.balMax=document.getElementById('balMax').value; state.sort=document.getElementById('sort').value; applyFilters();
+    });
+    document.getElementById('btnReset').addEventListener('click', ()=>{
+      ['kw','risk','regFrom','regTo','balMin','balMax','sort'].forEach(id=>document.getElementById(id).value = id==='sort'?'recent':'');
+      state = Object.assign(state, {kw:'',risk:'',regFrom:'',regTo:'',balMin:'',balMax:'',sort:'recent'});
+      applyFilters();
+    });
+    document.getElementById('btnExport').addEventListener('click', ()=>{
+      // 修复：导出列与 UI 一致，且手机号脱敏
+      var rows = state.filtered||USERS; 
+      var head=['用户ID','用户名','手机号码','注册时间','接单数','已完成','被驳回','可用余额','冻结','风控','最近活跃'];
+      var csv=[head.join(',')]; 
+      rows.forEach(r=> csv.push([r.id,r.name,maskPhone(r.phone),r.reg,r.take,r.done,r.reject,r.bal.toFixed(2),r.frozen.toFixed(2),r.risk,r.active].join(',')) );
+      var blob=new Blob(['\ufeff'+csv.join('\
+')],{type:'text/csv;charset=utf-8;'}); 
+      var url=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download='平台用户列表_接单平台.csv'; a.click(); URL.revokeObjectURL(url);
+    });
+
+    // 启动
+    applyFilters();
+  </script>
+<script src="p1-unify.js"></script>
+<script src="p2-unify.js"></script>
+</body>
+</html>
